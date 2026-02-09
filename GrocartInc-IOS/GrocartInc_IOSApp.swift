@@ -5,6 +5,13 @@
 //  Created by Athul Babu on 2026-02-03.
 //
 
+//
+//  GrocartInc_IOSApp.swift
+//  GrocartInc-IOS
+//
+//  Created by Athul Babu on 2026-02-03.
+//
+
 import SwiftUI
 import CoreData
 
@@ -14,7 +21,7 @@ struct GrocartInc_IOSApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            LoginView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
