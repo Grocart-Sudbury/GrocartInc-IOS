@@ -9,12 +9,12 @@ import SwiftUI
 
 struct ProfileView: View {
     private let menuItems: [(String, String, Color, AnyView?)] = [
-        ("bag.fill", "My Orders", .grocartGreen, nil),
-        ("mappin.circle.fill", "Delivery Addresses", Color(red: 0.2, green: 0.6, blue: 0.9), nil),
-        ("creditcard.fill", "Payment Methods", .purple, nil),
+        ("bag.fill", "My Orders", .grocartGreen, AnyView(MyOrdersView())),
+        ("mappin.circle.fill", "Delivery Addresses", Color(red: 0.2, green: 0.6, blue: 0.9), AnyView(DeliveryAddressesView())),
+        ("creditcard.fill", "Payment Methods", .purple, AnyView(PaymentMethodsView())),
         ("ticket.fill", "My Coupons", .orange, AnyView(MyCouponsView())),
-        ("bell.fill", "Notifications", .red, nil),
-        ("gearshape.fill", "Settings", .gray, nil)
+        ("bell.fill", "Notifications", .red, AnyView(NotificationsView())),
+        ("gearshape.fill", "Settings", .gray, AnyView(SettingsView()))
     ]
     
     var body: some View {
