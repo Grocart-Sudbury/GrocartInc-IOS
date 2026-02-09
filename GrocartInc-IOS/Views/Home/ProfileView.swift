@@ -5,27 +5,20 @@
 //  Created by Athul Babu on 2026-02-08.
 //
 
-//
-//  ProfileView.swift
-//  GrocartInc-IOS
-//
-//  Created by Athul Babu on 2026-02-08.
-//
-
 import SwiftUI
 
 struct ProfileView: View {
-    private let menuItems: [(String, String, Color)] = [
-        ("bag.fill", "My Orders", .grocartGreen),
-        ("mappin.circle.fill", "Delivery Addresses", Color(red: 0.2, green: 0.6, blue: 0.9)),
-        ("creditcard.fill", "Payment Methods", .purple),
-        ("ticket.fill", "My Coupons", .orange),
-        ("bell.fill", "Notifications", .red),
-        ("gearshape.fill", "Settings", .gray)
+    private let menuItems: [(String, String, Color, AnyView?)] = [
+        ("bag.fill", "My Orders", .grocartGreen, nil),
+        ("mappin.circle.fill", "Delivery Addresses", Color(red: 0.2, green: 0.6, blue: 0.9), nil),
+        ("creditcard.fill", "Payment Methods", .purple, nil),
+        ("ticket.fill", "My Coupons", .orange, AnyView(MyCouponsView())),
+        ("bell.fill", "Notifications", .red, nil),
+        ("gearshape.fill", "Settings", .gray, nil)
     ]
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.grocartBackground.ignoresSafeArea()
                 
@@ -89,27 +82,16 @@ struct ProfileView: View {
                         
                         // Menu Items
                         VStack(spacing: 2) {
-                            ForEach(menuItems, id: \.1) { icon, title, color in
-                                HStack(spacing: 14) {
-                                    Image(systemName: icon)
-                                        .font(.system(size: 15))
-                                        .foregroundColor(color)
-                                        .frame(width: 34, height: 34)
-                                        .background(color.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    
-                                    Text(title)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.grocartPrimary)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(.grocartSecondary)
+                            ForEach(menuItems, id: \.1) { icon, title, color, destination in
+                                if let destination = destination {
+                                    NavigationLink(destination: destination) {
+                                        MenuRow(icon: icon, title: title, color: color)
+                                    }
+                                } else {
+                                    Button(action: {}) {
+                                        MenuRow(icon: icon, title: title, color: color)
+                                    }
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
                             }
                         }
                         .background(Color.grocartSecondaryBackground)
@@ -141,6 +123,36 @@ struct ProfileView: View {
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
         }
+    }
+}
+
+// MARK: - Menu Row
+struct MenuRow: View {
+    let icon: String
+    let title: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundColor(color)
+                .frame(width: 34, height: 34)
+                .background(color.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.grocartPrimary)
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.grocartSecondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 }
 
