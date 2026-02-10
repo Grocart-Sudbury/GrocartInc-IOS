@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		DAA6ED1A2F3A8D6400EE6F2F /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = DAA6ED192F3A8D6400EE6F2F /* Alamofire */; };
-		DAA6ED1C2F3A8D6400EE6F2F /* AlamofireDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = DAA6ED1B2F3A8D6400EE6F2F /* AlamofireDynamic */; };
+		8E26C2E72F3AFA380017AB53 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 8E26C2E62F3AFA380017AB53 /* Alamofire */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,8 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DAA6ED1A2F3A8D6400EE6F2F /* Alamofire in Frameworks */,
-				DAA6ED1C2F3A8D6400EE6F2F /* AlamofireDynamic in Frameworks */,
+				8E26C2E72F3AFA380017AB53 /* Alamofire in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,8 +70,7 @@
 			);
 			name = "GrocartInc-IOS";
 			packageProductDependencies = (
-				DAA6ED192F3A8D6400EE6F2F /* Alamofire */,
-				DAA6ED1B2F3A8D6400EE6F2F /* AlamofireDynamic */,
+				8E26C2E62F3AFA380017AB53 /* Alamofire */,
 			);
 			productName = "GrocartInc-IOS";
 			productReference = DA50AED52F32E2E90090D573 /* GrocartInc-IOS.app */;
@@ -104,7 +101,7 @@
 			mainGroup = DA50AECC2F32E2E90090D573;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				DAA6ED182F3A8D6400EE6F2F /* XCRemoteSwiftPackageReference "Alamofire" */,
+				8E26C2E52F3AFA380017AB53 /* XCRemoteSwiftPackageReference "Alamofire" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DA50AED62F32E2E90090D573 /* Products */;
@@ -273,6 +270,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -305,6 +303,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -346,7 +345,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		DAA6ED182F3A8D6400EE6F2F /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+		8E26C2E52F3AFA380017AB53 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
 			requirement = {
@@ -357,15 +356,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		DAA6ED192F3A8D6400EE6F2F /* Alamofire */ = {
+		8E26C2E62F3AFA380017AB53 /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = DAA6ED182F3A8D6400EE6F2F /* XCRemoteSwiftPackageReference "Alamofire" */;
+			package = 8E26C2E52F3AFA380017AB53 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
-		};
-		DAA6ED1B2F3A8D6400EE6F2F /* AlamofireDynamic */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = DAA6ED182F3A8D6400EE6F2F /* XCRemoteSwiftPackageReference "Alamofire" */;
-			productName = AlamofireDynamic;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
