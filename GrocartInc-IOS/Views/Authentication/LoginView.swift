@@ -2,7 +2,7 @@
 //  LoginView.swift
 //  GrocartInc-IOS
 //
-//  Created by Athul Babu on 2026-02-08.
+//  Created by Athul Babu on 2026-02-09.
 //
 
 import SwiftUI
@@ -10,7 +10,6 @@ import SwiftUI
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
     @State private var showPassword = false
-    @State private var showOnboarding = false
     
     var body: some View {
         NavigationView {
@@ -65,6 +64,9 @@ struct LoginView: View {
                                         .autocapitalization(.none)
                                         .keyboardType(.emailAddress)
                                         .textContentType(.emailAddress)
+                                        .onChange(of: viewModel.email) { _ in
+                                            viewModel.clearError()
+                                        }
                                 }
                                 .padding()
                                 .background(Color.grocartSecondaryBackground)
@@ -133,12 +135,12 @@ struct LoginView: View {
                                 .padding()
                                 .background(Color.red.opacity(0.1))
                                 .cornerRadius(8)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
                             }
                             
                             // Login Button
                             Button(action: {
                                 viewModel.login()
-                                showOnboarding = true
                             }) {
                                 HStack {
                                     if viewModel.isLoading {
@@ -151,11 +153,11 @@ struct LoginView: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 54)
-                                .background(Color.grocartGreen)
+                                .background(viewModel.isFormValid ? Color.grocartGreen : Color.grocartGreen.opacity(0.5))
                                 .foregroundColor(.white)
                                 .cornerRadius(12)
                             }
-                            .disabled(viewModel.isLoading)
+                            .disabled(viewModel.isLoading || !viewModel.isFormValid)
                             .padding(.top, 10)
                             
                             // Divider
@@ -217,7 +219,9 @@ struct LoginView: View {
                 }
             }
             .navigationBarHidden(true)
-            .fullScreenCover(isPresented: $showOnboarding) {
+            .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
+            .fullScreenCover(isPresented: $viewModel.isLoginSuccessful) {
+                // Navigate to main app or onboarding
                 OnboardingView()
             }
         }
