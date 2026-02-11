@@ -26,7 +26,7 @@ struct APIConfig {
     // MARK: - Auth Endpoints
     struct Auth {
         static let login = "\(baseURL)/auth/login"
-        static let register = "\(baseURL)/auth/register"
+        static let register = "\(baseURL)/auth/register/customer"
         static let forgotPassword = "\(baseURL)/auth/forgot-password"
     }
     

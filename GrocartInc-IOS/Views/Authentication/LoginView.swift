@@ -177,14 +177,14 @@ struct LoginView: View {
                             }
                             .padding(.vertical, 10)
                             
-                            // Google Sign In Button
+                            // OTP Login Button
                             Button(action: {
-                                // TODO: Handle Google sign in
+                                // TODO: Handle OTP login
                             }) {
                                 HStack(spacing: 10) {
-                                    Image(systemName: "g.circle.fill")
+                                    Image(systemName: "message.badge.circle.fill")
                                         .font(.title3)
-                                    Text("Continue with Google")
+                                    Text("Sign In with OTP")
                                         .font(.system(size: 16, weight: .medium))
                                 }
                                 .frame(maxWidth: .infinity)
@@ -221,7 +221,6 @@ struct LoginView: View {
             .navigationBarHidden(true)
             .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
             .fullScreenCover(isPresented: $viewModel.isLoginSuccessful) {
-                // Navigate to main app or onboarding
                 OnboardingView()
             }
         }

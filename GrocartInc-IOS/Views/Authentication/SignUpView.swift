@@ -8,14 +8,9 @@
 import SwiftUI
 
 struct SignUpView: View {
-    @State private var fullName = ""
-    @State private var email = ""
-    @State private var phone = ""
-    @State private var password = ""
-    @State private var confirmPassword = ""
+    @StateObject private var viewModel = SignUpViewModel()
     @State private var isPasswordVisible = false
     @State private var isConfirmPasswordVisible = false
-    @State private var agreedToTerms = false
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -40,48 +35,87 @@ struct SignUpView: View {
                 
                 // Form Fields
                 VStack(spacing: 16) {
-                    InputField(
-                        icon: "person.fill",
-                        placeholder: "Full Name",
-                        text: $fullName
-                    )
+                    // First & Last Name
+                    HStack(spacing: 12) {
+                        InputField(
+                            icon: "person.fill",
+                            placeholder: "First Name",
+                            text: $viewModel.firstName
+                        )
+                        
+                        InputField(
+                            icon: "person.fill",
+                            placeholder: "Last Name",
+                            text: $viewModel.lastName
+                        )
+                    }
                     
                     InputField(
                         icon: "envelope.fill",
                         placeholder: "Email Address",
-                        text: $email,
+                        text: $viewModel.email,
                         keyboardType: .emailAddress
                     )
                     
                     InputField(
                         icon: "phone.fill",
                         placeholder: "Phone Number",
-                        text: $phone,
+                        text: $viewModel.phone,
                         keyboardType: .phonePad
                     )
                     
                     SecureInputField(
                         icon: "lock.fill",
                         placeholder: "Password",
-                        text: $password,
+                        text: $viewModel.password,
                         isVisible: $isPasswordVisible
                     )
                     
                     SecureInputField(
                         icon: "lock.fill",
                         placeholder: "Confirm Password",
-                        text: $confirmPassword,
+                        text: $viewModel.confirmPassword,
                         isVisible: $isConfirmPasswordVisible
                     )
+                    
+                    // Password Mismatch Warning
+                    if viewModel.passwordMismatch {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("Passwords do not match")
+                                .font(.system(size: 13))
+                                .foregroundColor(.orange)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 4)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+                
+                // Error Message
+                if let error = viewModel.errorMessage {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text(error)
+                            .font(.system(size: 13))
+                            .foregroundColor(.red)
+                        Spacer()
+                    }
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 
                 // Terms
                 HStack(alignment: .top, spacing: 10) {
                     Button {
-                        agreedToTerms.toggle()
+                        viewModel.agreedToTerms.toggle()
                     } label: {
-                        Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(agreedToTerms ? .green : .secondary)
+                        Image(systemName: viewModel.agreedToTerms ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(viewModel.agreedToTerms ? .green : .secondary)
                             .font(.title3)
                     }
                     
@@ -93,41 +127,26 @@ struct SignUpView: View {
                 
                 // Sign Up Button
                 Button {
-                    // Handle sign up
+                    viewModel.register()
                 } label: {
-                    Text("Create Account")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(isFormValid ? .green : .green.opacity(0.4))
-                        )
+                    HStack {
+                        if viewModel.isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text("Create Account")
+                                .font(.headline)
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(viewModel.isFormValid ? .green : .green.opacity(0.4))
+                    )
                 }
-                .disabled(!isFormValid)
-                
-                // Divider
-                HStack {
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundStyle(.secondary.opacity(0.3))
-                    Text("or")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundStyle(.secondary.opacity(0.3))
-                }
-                
-                // Social Sign Up
-                SocialButton(
-                    icon: "g.circle.fill",
-                    title: "Continue with Google",
-                    bgColor: Color(.secondarySystemBackground),
-                    fgColor: .primary,
-                    hasBorder: true
-                )
+                .disabled(!viewModel.isFormValid || viewModel.isLoading)
                 
                 // Sign In Link
                 HStack(spacing: 4) {
@@ -145,111 +164,14 @@ struct SignUpView: View {
             .padding(.horizontal, 24)
         }
         .navigationBarTitleDisplayMode(.inline)
-    }
-    
-    private var isFormValid: Bool {
-        !fullName.isEmpty &&
-        !email.isEmpty &&
-        !phone.isEmpty &&
-        !password.isEmpty &&
-        password == confirmPassword &&
-        agreedToTerms
-    }
-}
-
-// MARK: - Input Field Component
-struct InputField: View {
-    let icon: String
-    let placeholder: String
-    @Binding var text: String
-    var keyboardType: UIKeyboardType = .default
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
-            
-            TextField(placeholder, text: $text)
-                .keyboardType(keyboardType)
-                .textInputAutocapitalization(keyboardType == .emailAddress ? .never : .words)
-                .autocorrectionDisabled()
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-        )
-    }
-}
-
-// MARK: - Secure Input Field Component
-struct SecureInputField: View {
-    let icon: String
-    let placeholder: String
-    @Binding var text: String
-    @Binding var isVisible: Bool
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-                .frame(width: 20)
-            
-            Group {
-                if isVisible {
-                    TextField(placeholder, text: $text)
-                } else {
-                    SecureField(placeholder, text: $text)
-                }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.passwordMismatch)
+        .alert("Success", isPresented: $viewModel.isRegistrationSuccessful) {
+            Button("Sign In") {
+                dismiss()
             }
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            
-            Button {
-                isVisible.toggle()
-            } label: {
-                Image(systemName: isVisible ? "eye.slash.fill" : "eye.fill")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.secondarySystemBackground))
-        )
-    }
-}
-
-// MARK: - Social Button Component
-struct SocialButton: View {
-    let icon: String
-    let title: String
-    let bgColor: Color
-    let fgColor: Color
-    var hasBorder: Bool = false
-    
-    var body: some View {
-        Button {
-            // Handle social sign up
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.title3)
-                Text(title)
-                    .fontWeight(.medium)
-            }
-            .foregroundStyle(fgColor)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(bgColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(hasBorder ? Color.secondary.opacity(0.3) : .clear, lineWidth: 1)
-                    )
-            )
+        } message: {
+            Text(viewModel.successMessage ?? "Registration successful. Please login.")
         }
     }
 }
