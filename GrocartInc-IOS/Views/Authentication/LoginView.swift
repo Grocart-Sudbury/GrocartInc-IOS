@@ -220,9 +220,6 @@ struct LoginView: View {
             }
             .navigationBarHidden(true)
             .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
-            .fullScreenCover(isPresented: $viewModel.isLoginSuccessful) {
-                OnboardingView()
-            }
         }
     }
 }

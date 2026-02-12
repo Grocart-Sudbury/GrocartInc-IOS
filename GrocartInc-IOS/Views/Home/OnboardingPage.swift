@@ -28,8 +28,7 @@ struct OnboardingFeature: Identifiable {
 // MARK: - Main Onboarding View
 struct OnboardingView: View {
     @State private var currentPage = 0
-    @State private var showHome = false
-    @Environment(\.dismiss) private var dismiss
+    var onComplete: () -> Void
     
     private let pages: [OnboardingPage] = [
         OnboardingPage(
@@ -82,7 +81,7 @@ struct OnboardingView: View {
                 HStack {
                     Spacer()
                     Button(action: {
-                        showHome = true
+                        onComplete()
                     }) {
                         Text("Skip")
                             .font(.system(size: 15, weight: .medium))
@@ -123,7 +122,7 @@ struct OnboardingView: View {
                                 currentPage += 1
                             }
                         } else {
-                            showHome = true
+                            onComplete()
                         }
                     }) {
                         HStack(spacing: 8) {
@@ -158,13 +157,10 @@ struct OnboardingView: View {
             }
         }
         .navigationBarHidden(true)
-        .fullScreenCover(isPresented: $showHome) {
-            MainTabView()
-        }
     }
 }
 
-// MARK: - Individual Page View
+// MARK: - Individual Page View (unchanged)
 struct OnboardingPageView: View {
     let page: OnboardingPage
     @State private var appeared = false
@@ -175,7 +171,6 @@ struct OnboardingPageView: View {
             
             // Icon Section
             ZStack {
-                // Background glow
                 Circle()
                     .fill(
                         RadialGradient(
@@ -188,13 +183,11 @@ struct OnboardingPageView: View {
                     .frame(width: 150, height: 150)
                     .scaleEffect(appeared ? 1.0 : 0.5)
                 
-                // Outer ring
                 Circle()
                     .stroke(page.gradientColors[0].opacity(0.15), lineWidth: 1.5)
                     .frame(width: 120, height: 120)
                     .scaleEffect(appeared ? 1.0 : 0.8)
                 
-                // Inner circle
                 Circle()
                     .fill(
                         LinearGradient(
@@ -207,13 +200,11 @@ struct OnboardingPageView: View {
                     .shadow(color: page.gradientColors[0].opacity(0.4), radius: 16, y: 8)
                     .scaleEffect(appeared ? 1.0 : 0.6)
                 
-                // Main icon
                 Image(systemName: page.icon)
                     .font(.system(size: 34, weight: .medium))
                     .foregroundColor(.white)
                     .scaleEffect(appeared ? 1.0 : 0.3)
                 
-                // Secondary floating icon
                 Image(systemName: page.iconSecondary)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(page.gradientColors[0])
@@ -227,7 +218,6 @@ struct OnboardingPageView: View {
                     .scaleEffect(appeared ? 1.0 : 0.0)
             }
             
-            // Text Content
             VStack(spacing: 10) {
                 Text(page.title)
                     .font(.system(size: 28, weight: .bold))
@@ -248,7 +238,6 @@ struct OnboardingPageView: View {
                     .offset(y: appeared ? 0 : 20)
             }
             
-            // Highlight Badge
             Text(page.highlight)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(page.gradientColors[0])
@@ -261,7 +250,6 @@ struct OnboardingPageView: View {
                 .opacity(appeared ? 1 : 0)
                 .scaleEffect(appeared ? 1.0 : 0.8)
             
-            // Feature List
             VStack(spacing: 10) {
                 ForEach(Array(page.features.enumerated()), id: \.element.id) { index, feature in
                     HStack(spacing: 12) {
@@ -311,5 +299,5 @@ struct OnboardingPageView: View {
 }
 
 #Preview {
-    OnboardingView()
+    OnboardingView(onComplete: {})
 }
