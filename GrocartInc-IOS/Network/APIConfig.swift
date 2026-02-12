@@ -29,8 +29,11 @@ struct APIConfig {
         static let register = "\(baseURL)/auth/register/customer"
         static let forgotPassword = "\(baseURL)/auth/forgot-password"
     }
-    
+    struct Products {
+           static let categories = "\(baseURL)/categories"
+       }
     // MARK: - Timeouts
     static let requestTimeout: TimeInterval = 30
     static let resourceTimeout: TimeInterval = 60
+    static let categoryCacheTTL: TimeInterval = 30 * 60
 }
