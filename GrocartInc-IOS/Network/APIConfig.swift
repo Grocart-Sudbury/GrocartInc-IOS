@@ -38,6 +38,10 @@ struct APIConfig {
         static let active = "\(baseURL)/stores/active"
     }
 
+    struct Cart {
+        static let pricing = "\(baseURL)/cart/pricing"
+    }
+
     struct Products {
         static let categories = "\(baseURL)/categories"
     }

@@ -284,7 +284,10 @@ struct HomeTabView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
                         ForEach(viewModel.stores) { store in
-                            StoreCard(store: store)
+                            NavigationLink(destination: StoreDetailView(store: store)) {
+                                StoreCard(store: store)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 20)

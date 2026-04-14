@@ -23,10 +23,18 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "ProductR
 final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
     
     static let shared = ProductRepository()
-    
+
     private let cache = CacheManager.shared
     private let cacheKey = "categories"
-    
+
+    // Public session for store-specific category fetch (no auth required)
+    private let publicSession: Session = {
+        let config = URLSessionConfiguration.af.default
+        config.timeoutIntervalForRequest = APIConfig.requestTimeout
+        config.timeoutIntervalForResource = APIConfig.resourceTimeout
+        return Session(configuration: config)
+    }()
+
     private init() {}
     
     // MARK: - Fetch Categories (Cache-first)
@@ -55,6 +63,37 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
         return categories
     }
     
+    // MARK: - Fetch Categories by Store ID (public endpoint, no cache)
+    func fetchCategories(storeId: Int) async throws -> [Category] {
+        logger.info("Fetching categories for storeId: \(storeId)")
+
+        let task = publicSession.request(
+            APIConfig.Products.categories,
+            method: .get,
+            parameters: ["storeId": storeId],
+            encoding: URLEncoding.queryString
+        )
+        .validate(statusCode: 200..<300)
+        .serializingData()
+
+        let response = await task.response
+        logger.info("STATUS CODE: \(response.response?.statusCode ?? -1)")
+
+        switch response.result {
+        case .success(let data):
+            let raw = String(data: data, encoding: .utf8) ?? "nil"
+            logger.debug("RAW RESPONSE: \(raw.prefix(500))")
+            do {
+                return try JSONDecoder().decode([Category].self, from: data)
+            } catch {
+                logger.error("DECODE ERROR: \(error)")
+                throw NetworkError.unknown(error)
+            }
+        case .failure(let afError):
+            throw mapError(afError, data: response.data, statusCode: response.response?.statusCode)
+        }
+    }
+
     // MARK: - Invalidate Cache
     func invalidateCache() {
         cache.clear(forKey: cacheKey)
