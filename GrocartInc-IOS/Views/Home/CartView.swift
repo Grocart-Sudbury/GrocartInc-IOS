@@ -11,6 +11,7 @@ struct CartView: View {
     @ObservedObject private var cartManager = CartManager.shared
     @StateObject private var viewModel = CartViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var navigateToCheckout = false
 
     var body: some View {
         NavigationView {
@@ -231,23 +232,35 @@ struct CartView: View {
 
     // MARK: - Place Order Button
     private var placeOrderButton: some View {
-        Button(action: {}) {
-            HStack {
-                Text("Place Order")
-                    .font(.system(size: 17, weight: .semibold))
-                Spacer()
-                if let total = viewModel.pricing?.formattedTotal {
-                    Text(total)
-                        .font(.system(size: 17, weight: .bold))
-                }
+        VStack(spacing: 0) {
+            if let pricing = viewModel.pricing {
+                NavigationLink(destination: CheckoutView(pricing: pricing),
+                               isActive: $navigateToCheckout) { EmptyView() }
             }
-            .foregroundColor(.white)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
-            .background(Color.grocartGreen)
-            .cornerRadius(16)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            Button(action: {
+                guard viewModel.pricing != nil else { return }
+                navigateToCheckout = true
+            }) {
+                HStack {
+                    Text("Proceed to Checkout")
+                        .font(.system(size: 17, weight: .semibold))
+                    Spacer()
+                    if let total = viewModel.pricing?.formattedTotal {
+                        Text(total)
+                            .font(.system(size: 17, weight: .bold))
+                    } else {
+                        ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .background(viewModel.pricing != nil ? Color.grocartGreen : Color.grocartGreen.opacity(0.5))
+                .cornerRadius(16)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
+            .disabled(viewModel.pricing == nil)
         }
         .background(Color.grocartBackground)
     }
