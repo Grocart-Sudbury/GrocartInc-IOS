@@ -18,7 +18,7 @@ struct APIConfig {
     
     // MARK: - Base URL
     #if DEBUG
-    static let baseURL = "http://localhost:9091/api"
+    static let baseURL = "http://147.93.114.66:9092/api"
     #else
     static let baseURL = "https://yourdomain.com/api"
     #endif
@@ -29,9 +29,18 @@ struct APIConfig {
         static let register = "\(baseURL)/auth/register/customer"
         static let forgotPassword = "\(baseURL)/auth/forgot-password"
     }
+    struct OTP {
+        static let send = "\(baseURL)/otp/send"
+        static let verify = "\(baseURL)/otp/verify"
+    }
+
+    struct Stores {
+        static let active = "\(baseURL)/stores/active"
+    }
+
     struct Products {
-           static let categories = "\(baseURL)/categories"
-       }
+        static let categories = "\(baseURL)/categories"
+    }
     // MARK: - Timeouts
     static let requestTimeout: TimeInterval = 30
     static let resourceTimeout: TimeInterval = 60

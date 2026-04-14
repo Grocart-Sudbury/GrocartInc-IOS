@@ -9,7 +9,9 @@ import SwiftUI
 
 struct HomeTabView: View {
     @StateObject private var viewModel = HomeViewModel()
+    @ObservedObject private var locationState = LocationState.shared
     @State private var searchText = ""
+    @State private var showCityPicker = false
     
     private let bannerDeals = [
         ("Fresh Produce Sale", "Up to 30% off fruits & vegetables", "leaf.fill", Color.grocartGreen),
@@ -81,10 +83,10 @@ struct HomeTabView: View {
                             } else {
                                 // Promo Banners
                                 promoBannersSection
-                                
-                                // Categories from API
-                                categoriesSection
-                                
+
+                                // Stores
+                                storesSection
+
                                 // Today's Deals (on-sale products)
                                 if !viewModel.featuredProducts.isEmpty {
                                     dealsSection
@@ -108,6 +110,19 @@ struct HomeTabView: View {
         }
         .onAppear {
             viewModel.loadData()
+            LocationManager.shared.requestLocationIfNeeded()
+        }
+        .onChange(of: locationState.cityName) { newValue in
+            if newValue == "Location Off" {
+                showCityPicker = true
+            }
+        }
+        .confirmationDialog("Choose Your City", isPresented: $showCityPicker, titleVisibility: .visible) {
+            Button("Sudbury") { locationState.cityName = "Sudbury" }
+            Button("Timmins") { locationState.cityName = "Timmins" }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Location access is off. Select your delivery city.")
         }
     }
     
@@ -120,16 +135,19 @@ struct HomeTabView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.grocartSecondary)
                     
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.circle.fill")
-                            .foregroundColor(.grocartGreen)
-                            .font(.system(size: 14))
-                        Text("Timmins, ON")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.grocartPrimary)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.grocartPrimary)
+                    Button(action: { showCityPicker = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.circle.fill")
+                                .foregroundColor(.grocartGreen)
+                                .font(.system(size: 14))
+                            Text(locationState.cityName)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.grocartPrimary)
+                                .redacted(reason: locationState.cityName == "Locating..." ? .placeholder : [])
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.grocartPrimary)
+                        }
                     }
                 }
                 
@@ -219,39 +237,58 @@ struct HomeTabView: View {
         }
     }
     
-    // MARK: - Categories
-    private var categoriesSection: some View {
+    // MARK: - Stores
+    private var storesSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Shop by Category")
+                Text("Stores Near You")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.grocartPrimary)
                 Spacer()
-                Button("See All") {}
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.grocartGreen)
             }
             .padding(.horizontal, 20)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(viewModel.categories) { category in
-                        VStack(spacing: 8) {
-                            Text(categoryIcons[category.name] ?? "🛒")
-                                .font(.system(size: 28))
-                                .frame(width: 60, height: 60)
-                                .background(Color.grocartSecondaryBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                            
-                            Text(category.name)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(.grocartPrimary)
-                                .lineLimit(1)
-                                .frame(width: 70)
+
+            if viewModel.isLoadingStores {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .frame(height: 140)
+            } else if viewModel.stores.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "storefront")
+                            .font(.system(size: 32))
+                            .foregroundColor(.grocartSecondary)
+                        Text("No stores available in \(locationState.cityName)")
+                            .font(.system(size: 13))
+                            .foregroundColor(.grocartSecondary)
+                            .multilineTextAlignment(.center)
+                        Button(action: { showCityPicker = true }) {
+                            Text("Change City")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(Color.grocartGreen)
+                                .cornerRadius(10)
                         }
                     }
+                    Spacer()
                 }
+                .frame(height: 150)
                 .padding(.horizontal, 20)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(viewModel.stores) { store in
+                            StoreCard(store: store)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
             }
         }
     }
@@ -568,6 +605,82 @@ struct ProductGridCard: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.gray.opacity(0.12), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Store Card
+struct StoreCard: View {
+    let store: Store
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Banner
+            ZStack(alignment: .bottomLeading) {
+                if let bannerUrl = store.bannerUrl, let url = URL(string: bannerUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        default:
+                            Color.grocartSecondaryBackground
+                        }
+                    }
+                } else {
+                    LinearGradient(
+                        colors: [Color.grocartGreen.opacity(0.7), Color.grocartGreen],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+
+                // Logo overlay
+                if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let image) = phase {
+                            image.resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 44, height: 44)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white, lineWidth: 2))
+                        }
+                    }
+                    .padding(10)
+                }
+            }
+            .frame(width: 220, height: 110)
+            .clipped()
+
+            // Info
+            VStack(alignment: .leading, spacing: 6) {
+                Text(store.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.grocartPrimary)
+                    .lineLimit(1)
+
+                Text(store.address)
+                    .font(.system(size: 11))
+                    .foregroundColor(.grocartSecondary)
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Label(store.formattedDeliveryFee, systemImage: "bicycle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.grocartGreen)
+
+                    Text("·")
+                        .foregroundColor(.grocartSecondary)
+
+                    Text(store.formattedMinOrder)
+                        .font(.system(size: 11))
+                        .foregroundColor(.grocartSecondary)
+                }
+            }
+            .padding(10)
+        }
+        .frame(width: 220)
+        .background(Color.grocartBackground)
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.12), lineWidth: 1))
     }
 }
 

@@ -10,6 +10,7 @@ import SwiftUI
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
     @State private var showPassword = false
+    @State private var navigateToOTP = false
     
     var body: some View {
         NavigationView {
@@ -178,9 +179,10 @@ struct LoginView: View {
                             .padding(.vertical, 10)
                             
                             // OTP Login Button
-                            Button(action: {
-                                // TODO: Handle OTP login
-                            }) {
+                            NavigationLink(destination: OTPLoginView(), isActive: $navigateToOTP) {
+                                EmptyView()
+                            }
+                            Button(action: { navigateToOTP = true }) {
                                 HStack(spacing: 10) {
                                     Image(systemName: "message.badge.circle.fill")
                                         .font(.title3)

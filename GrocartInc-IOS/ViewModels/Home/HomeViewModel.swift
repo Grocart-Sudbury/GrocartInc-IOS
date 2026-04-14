@@ -17,12 +17,16 @@ import Combine
 
 @MainActor
 final class HomeViewModel: ObservableObject {
-    
+
     // MARK: - Published Properties
     @Published var categories: [Category] = []
+    @Published var stores: [Store] = []
+    @Published var isLoadingStores: Bool = false
     @Published var isLoading: Bool = false
     @Published var isRefreshing: Bool = false
     @Published var errorMessage: String?
+
+    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed
     var featuredProducts: [Product] {
@@ -40,10 +44,23 @@ final class HomeViewModel: ObservableObject {
     
     // MARK: - Dependencies
     private let productRepository: ProductRepositoryProtocol
-    
+    private let storeRepository: StoreRepository
+
     // MARK: - Init
     init(productRepository: ProductRepositoryProtocol? = nil) {
         self.productRepository = productRepository ?? ProductRepository.shared
+        self.storeRepository = StoreRepository.shared
+
+        // Re-fetch stores whenever the city resolves or changes
+        LocationState.shared.$cityName
+            .filter { city in
+                !city.isEmpty && city != "Locating..." && city != "Location Off"
+            }
+            .removeDuplicates()
+            .sink { [weak self] city in
+                Task { await self?.loadStores(city: city) }
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Load Data (cache-first)
@@ -103,6 +120,17 @@ final class HomeViewModel: ObservableObject {
         isRefreshing = false
     }
     
+    // MARK: - Load Stores
+    func loadStores(city: String) async {
+        isLoadingStores = true
+        do {
+            stores = try await storeRepository.fetchActiveStores(city: city)
+        } catch {
+            // Silently fail — stores list just stays empty
+        }
+        isLoadingStores = false
+    }
+
     // MARK: - Search
     func searchProducts(query: String) -> [Product] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

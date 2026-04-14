@@ -33,7 +33,7 @@ enum NetworkError: LocalizedError {
         case .decodingError:
             return "Unable to process server response."
         case .unauthorized:
-            return "Invalid email or password."
+            return "Your session has expired. Please sign in again."
         case .serverError(let message):
             return message
         case .networkUnavailable:

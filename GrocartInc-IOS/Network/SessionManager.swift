@@ -52,6 +52,32 @@ final class SessionManager: ObservableObject {
         }
     }
     
+    // MARK: - Save Session (OTP)
+    func saveSession(from response: OTPVerifyResponse) {
+        guard let token = response.token, let customer = response.customer else { return }
+
+        let user = User(
+            id: customer.id,
+            email: customer.email,
+            role: "CUSTOMER",
+            firstName: customer.firstName,
+            lastName: customer.lastName,
+            token: token
+        )
+
+        KeychainManager.shared.save(key: KeychainManager.Keys.authToken, value: token)
+        KeychainManager.shared.save(key: KeychainManager.Keys.userId, value: String(customer.id))
+
+        if let userData = try? JSONEncoder().encode(user) {
+            UserDefaults.standard.set(userData, forKey: "current_user")
+        }
+
+        DispatchQueue.main.async {
+            self.currentUser = user
+            self.isLoggedIn = true
+        }
+    }
+
     // MARK: - Load Session
     func loadSession() {
         guard let token = KeychainManager.shared.get(key: KeychainManager.Keys.authToken),

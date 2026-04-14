@@ -55,11 +55,32 @@ final class AuthRepository: @unchecked Sendable, AuthRepositoryProtocol {
         )
     }
     
+    // MARK: - Send OTP
+    func sendOTP(email: String) async throws -> OTPSendResponse {
+        return try await performRequest(
+            url: APIConfig.OTP.send,
+            method: .post,
+            parameters: ["email": email],
+            encoding: URLEncoding.queryString
+        )
+    }
+
+    // MARK: - Verify OTP
+    func verifyOTP(email: String, otp: String) async throws -> OTPVerifyResponse {
+        return try await performRequest(
+            url: APIConfig.OTP.verify,
+            method: .post,
+            parameters: ["email": email, "otp": otp],
+            encoding: URLEncoding.queryString
+        )
+    }
+
     // MARK: - Generic Request Helper
     private func performRequest<T: Decodable>(
         url: String,
         method: HTTPMethod,
-        parameters: [String: Any]
+        parameters: [String: Any],
+        encoding: ParameterEncoding = JSONEncoding.default
     ) async throws -> T {
         logger.info("REQUEST: \(method.rawValue) \(url)")
         logger.debug("PARAMETERS: \(parameters.description)")
@@ -68,7 +89,7 @@ final class AuthRepository: @unchecked Sendable, AuthRepositoryProtocol {
             url,
             method: method,
             parameters: parameters,
-            encoding: JSONEncoding.default
+            encoding: encoding
         )
         .validate(statusCode: 200..<300)
         .serializingData()
@@ -106,19 +127,13 @@ final class AuthRepository: @unchecked Sendable, AuthRepositoryProtocol {
         // Try JSON error response first
         if let data = data,
            let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
-            if statusCode == 401 {
-                return .unauthorized
-            }
             return .serverError(errorResponse.displayMessage)
         }
-        
+
         // Fall back to plain text error response
         if let data = data,
            let plainText = String(data: data, encoding: .utf8),
            !plainText.isEmpty {
-            if statusCode == 401 {
-                return .unauthorized
-            }
             return .serverError(plainText)
         }
         
