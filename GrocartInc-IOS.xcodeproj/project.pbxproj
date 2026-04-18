@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		8E26C2E72F3AFA380017AB53 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 8E26C2E62F3AFA380017AB53 /* Alamofire */; };
+		DA230E112F935D9800179F98 /* StripePayments in Frameworks */ = {isa = PBXBuildFile; productRef = DA230E102F935D9800179F98 /* StripePayments */; };
+		DA230E132F935D9800179F98 /* StripePaymentsUI in Frameworks */ = {isa = PBXBuildFile; productRef = DA230E122F935D9800179F98 /* StripePaymentsUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +42,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DA230E132F935D9800179F98 /* StripePaymentsUI in Frameworks */,
+				DA230E112F935D9800179F98 /* StripePayments in Frameworks */,
 				8E26C2E72F3AFA380017AB53 /* Alamofire in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,6 +88,8 @@
 			name = "GrocartInc-IOS";
 			packageProductDependencies = (
 				8E26C2E62F3AFA380017AB53 /* Alamofire */,
+				DA230E102F935D9800179F98 /* StripePayments */,
+				DA230E122F935D9800179F98 /* StripePaymentsUI */,
 			);
 			productName = "GrocartInc-IOS";
 			productReference = DA50AED52F32E2E90090D573 /* GrocartInc-IOS.app */;
@@ -115,6 +121,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				8E26C2E52F3AFA380017AB53 /* XCRemoteSwiftPackageReference "Alamofire" */,
+				DA230E0F2F935D9800179F98 /* XCRemoteSwiftPackageReference "stripe-ios-spm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DA50AED62F32E2E90090D573 /* Products */;
@@ -358,6 +365,14 @@
 				minimumVersion = 5.11.1;
 			};
 		};
+		DA230E0F2F935D9800179F98 /* XCRemoteSwiftPackageReference "stripe-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stripe/stripe-ios-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 25.11.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -365,6 +380,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 8E26C2E52F3AFA380017AB53 /* XCRemoteSwiftPackageReference "Alamofire" */;
 			productName = Alamofire;
+		};
+		DA230E102F935D9800179F98 /* StripePayments */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA230E0F2F935D9800179F98 /* XCRemoteSwiftPackageReference "stripe-ios-spm" */;
+			productName = StripePayments;
+		};
+		DA230E122F935D9800179F98 /* StripePaymentsUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DA230E0F2F935D9800179F98 /* XCRemoteSwiftPackageReference "stripe-ios-spm" */;
+			productName = StripePaymentsUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

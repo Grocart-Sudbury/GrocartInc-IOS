@@ -8,6 +8,17 @@
 import Foundation
 import Combine
 
+enum CheckoutCover: Identifiable {
+    case confirmation(OrderResponse)
+    case payment(OrderResponse)
+    var id: String {
+        switch self {
+        case .confirmation(let o): return "confirm-\(o.id)"
+        case .payment(let o):      return "payment-\(o.id)"
+        }
+    }
+}
+
 @MainActor
 final class CheckoutViewModel: ObservableObject {
 
@@ -33,7 +44,7 @@ final class CheckoutViewModel: ObservableObject {
     // MARK: - State
     @Published var isPlacingOrder = false
     @Published var errorMessage: String? = nil
-    @Published var placedOrder: OrderResponse? = nil
+    @Published var activeCover: CheckoutCover? = nil
 
     // MARK: - Dependencies
     let pricing: CartPricingResponse
@@ -126,13 +137,17 @@ final class CheckoutViewModel: ObservableObject {
             do {
                 let result = try await repository.placeOrder(request)
                 cartManager.clear()
-                placedOrder = result
+                isPlacingOrder = false          // settle state before triggering cover
+                activeCover = paymentMethod == "STRIPE"
+                    ? .payment(result)
+                    : .confirmation(result)
             } catch let error as NetworkError {
                 errorMessage = error.errorDescription
+                isPlacingOrder = false
             } catch {
                 errorMessage = "Something went wrong. Please try again."
+                isPlacingOrder = false
             }
-            isPlacingOrder = false
         }
     }
 }

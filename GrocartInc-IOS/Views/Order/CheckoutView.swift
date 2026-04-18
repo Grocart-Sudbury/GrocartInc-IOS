@@ -56,8 +56,15 @@ struct CheckoutView: View {
         .navigationTitle("Checkout")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) { placeOrderButton }
-        .fullScreenCover(item: $viewModel.placedOrder) { order in
-            OrderConfirmationView(order: order)
+        .fullScreenCover(item: $viewModel.activeCover) { cover in
+            switch cover {
+            case .confirmation(let order):
+                OrderConfirmationView(order: order)
+            case .payment(let order):
+                PaymentView(order: order) { confirmedOrder in
+                    viewModel.activeCover = .confirmation(confirmedOrder)
+                }
+            }
         }
     }
 
