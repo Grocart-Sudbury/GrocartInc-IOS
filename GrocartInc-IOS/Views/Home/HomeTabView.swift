@@ -10,7 +10,6 @@ import SwiftUI
 struct HomeTabView: View {
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject private var locationState = LocationState.shared
-    @State private var searchText = ""
     @State private var showCityPicker = false
     
     private let bannerDeals = [
@@ -28,13 +27,6 @@ struct HomeTabView: View {
         "Seafood/Frozen": "🐟",
         "Households": "🏠"
     ]
-    
-    var filteredProducts: [Product] {
-        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return []
-        }
-        return viewModel.searchProducts(query: searchText)
-    }
     
     var body: some View {
         NavigationView {
@@ -77,28 +69,23 @@ struct HomeTabView: View {
                             // Header
                             headerSection
                             
-                            // Search Results
-                            if !searchText.isEmpty {
-                                searchResultsSection
-                            } else {
-                                // Promo Banners
-                                promoBannersSection
+                            // Promo Banners
+                            promoBannersSection
 
-                                // Stores
-                                storesSection
+                            // Stores
+                            storesSection
 
-                                // Today's Deals (on-sale products)
-                                if !viewModel.featuredProducts.isEmpty {
-                                    dealsSection
-                                }
-                                
-                                // Browse by Category sections
-                                ForEach(viewModel.categories) { category in
-                                    categoryProductsSection(category: category)
-                                }
-                                
-                                Spacer().frame(height: 20)
+                            // Today's Deals (on-sale products)
+                            if !viewModel.featuredProducts.isEmpty {
+                                dealsSection
                             }
+
+                            // Browse by Category sections
+                            ForEach(viewModel.categories) { category in
+                                categoryProductsSection(category: category)
+                            }
+
+                            Spacer().frame(height: 20)
                         }
                     }
                     .refreshable {
@@ -170,54 +157,9 @@ struct HomeTabView: View {
                 }
             }
             
-            // Search bar
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.grocartSecondary)
-                
-                TextField("Search groceries...", text: $searchText)
-                    .font(.system(size: 15))
-                
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.grocartSecondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Color.grocartSecondaryBackground)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-            )
-        }
+}
         .padding(.horizontal, 20)
         .padding(.top, 8)
-    }
-    
-    // MARK: - Search Results
-    private var searchResultsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(filteredProducts.isEmpty ? "No results for \"\(searchText)\"" : "\(filteredProducts.count) results")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.grocartPrimary)
-                .padding(.horizontal, 20)
-            
-            if !filteredProducts.isEmpty {
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 14),
-                    GridItem(.flexible(), spacing: 14)
-                ], spacing: 14) {
-                    ForEach(filteredProducts) { product in
-                        ProductGridCard(product: product)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
     }
     
     // MARK: - Promo Banners
