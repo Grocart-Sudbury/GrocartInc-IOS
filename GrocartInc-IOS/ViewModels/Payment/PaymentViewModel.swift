@@ -93,7 +93,7 @@ final class PaymentViewModel: ObservableObject {
                     orderId: order.id,
                     paymentMethodId: card.id
                 ))
-                logger.info("✅ chargeCard() response — success=\(response.success) requiresAction=\(response.requiresAction) status=\(response.status)")
+                logger.info("✅ chargeCard() response — success=\(response.success) requiresAction=\(response.requiresAction.map(String.init) ?? "nil") status=\(response.status)")
                 handleChargeResponse(response)
             } catch let error as NetworkError {
                 logger.error("❌ chargeCard() NetworkError: \(error.errorDescription ?? "unknown")")
@@ -124,7 +124,7 @@ final class PaymentViewModel: ObservableObject {
                     orderId: order.id,
                     paymentMethodId: paymentMethodId
                 ))
-                logger.info("✅ attachAndCharge() charge response — success=\(chargeResponse.success) requiresAction=\(chargeResponse.requiresAction)")
+                logger.info("✅ attachAndCharge() charge response — success=\(chargeResponse.success) requiresAction=\(chargeResponse.requiresAction.map(String.init) ?? "nil")")
                 handleChargeResponse(chargeResponse)
             } catch let error as NetworkError {
                 logger.error("❌ attachAndCharge() NetworkError: \(error.errorDescription ?? "unknown")")
@@ -192,8 +192,8 @@ final class PaymentViewModel: ObservableObject {
 
     // MARK: - Private
     private func handleChargeResponse(_ response: ChargeResponse) {
-        logger.info("🔀 handleChargeResponse() — success=\(response.success) requiresAction=\(response.requiresAction) message='\(response.message)'")
-        if response.requiresAction, let secret = response.clientSecret {
+        logger.info("🔀 handleChargeResponse() — success=\(response.success) requiresAction=\(response.requiresAction.map(String.init) ?? "nil") message='\(response.message)'")
+        if response.requiresAction == true, let secret = response.clientSecret {
             logger.info("  → 3DS required, setting requiresAction")
             requiresAction = PaymentActionState(
                 clientSecret: secret,

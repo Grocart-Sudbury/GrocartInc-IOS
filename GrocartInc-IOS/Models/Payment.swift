@@ -42,7 +42,7 @@ struct ChargeResponse: Decodable {
     let status: String
     let success: Bool
     let message: String
-    let requiresAction: Bool
+    let requiresAction: Bool?
     let clientSecret: String?
 }
 
