@@ -21,6 +21,7 @@ final class SearchViewModel: ObservableObject {
     @Published var selectedStore: Store?
     @Published var searchText = ""
     @Published var searchResults: [SearchResult] = []
+    @Published var recentSearches: [String] = []
     @Published var isLoadingStores = false
     @Published var isLoadingProducts = false
 
@@ -29,7 +30,12 @@ final class SearchViewModel: ObservableObject {
     private let storeRepository = StoreRepository.shared
     private let productRepository = ProductRepository.shared
 
+    private static let recentSearchesKey = "search_recent_queries"
+    private static let maxRecentSearches = 10
+
     init() {
+        recentSearches = Self.loadRecentSearches()
+
         // Re-load stores when city changes
         LocationState.shared.$cityName
             .filter { !$0.isEmpty && $0 != "Locating..." && $0 != "Location Off" }
@@ -105,5 +111,42 @@ final class SearchViewModel: ObservableObject {
                 }
                 .map { SearchResult(product: $0, categoryName: category.name) }
         }
+        if !searchResults.isEmpty {
+            saveSearch(trimmed)
+        }
+    }
+
+    // MARK: - Search History
+
+    func applyRecent(_ query: String) {
+        searchText = query
+    }
+
+    func removeRecent(_ query: String) {
+        recentSearches.removeAll { $0 == query }
+        Self.persist(recentSearches)
+    }
+
+    func clearAllRecent() {
+        recentSearches = []
+        Self.persist([])
+    }
+
+    private func saveSearch(_ query: String) {
+        var updated = recentSearches.filter { $0.lowercased() != query.lowercased() }
+        updated.insert(query, at: 0)
+        if updated.count > Self.maxRecentSearches {
+            updated = Array(updated.prefix(Self.maxRecentSearches))
+        }
+        recentSearches = updated
+        Self.persist(updated)
+    }
+
+    private static func loadRecentSearches() -> [String] {
+        UserDefaults.standard.stringArray(forKey: recentSearchesKey) ?? []
+    }
+
+    private static func persist(_ searches: [String]) {
+        UserDefaults.standard.set(searches, forKey: recentSearchesKey)
     }
 }

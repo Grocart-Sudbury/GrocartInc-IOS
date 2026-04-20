@@ -197,15 +197,55 @@ struct SearchView: View {
 
     private var idleSearchState: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Start typing to search products in \(viewModel.selectedStore?.name ?? "this store")")
-                    .font(.system(size: 14))
-                    .foregroundColor(.grocartSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 50)
+            VStack(alignment: .leading, spacing: 24) {
+                if !viewModel.recentSearches.isEmpty {
+                    recentSearchesSection
+                } else {
+                    Text("Start typing to search products in \(viewModel.selectedStore?.name ?? "this store")")
+                        .font(.system(size: 14))
+                        .foregroundColor(.grocartSecondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 50)
+                }
             }
             .padding(20)
+        }
+    }
+
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Recent Searches")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.grocartPrimary)
+                Spacer()
+                Button("Clear All") { viewModel.clearAllRecent() }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.grocartGreen)
+            }
+
+            ForEach(viewModel.recentSearches, id: \.self) { query in
+                HStack(spacing: 12) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 14))
+                        .foregroundColor(.grocartSecondary)
+
+                    Button(action: { viewModel.applyRecent(query) }) {
+                        Text(query)
+                            .font(.system(size: 15))
+                            .foregroundColor(.grocartPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    Button(action: { viewModel.removeRecent(query) }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.grocartSecondary)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
         }
     }
 }

@@ -19,33 +19,26 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            CategoriesView()
-                .tabItem {
-                    Image(systemName: selectedTab == 1 ? "square.grid.2x2.fill" : "square.grid.2x2")
-                    Text("Categories")
-                }
-                .tag(1)
-            
             SearchView()
                 .tabItem {
-                    Image(systemName: selectedTab == 2 ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                    Image(systemName: selectedTab == 1 ? "magnifyingglass.circle.fill" : "magnifyingglass")
                     Text("Search")
                 }
-                .tag(2)
-            
+                .tag(1)
+
             CartView()
                 .tabItem {
-                    Image(systemName: selectedTab == 3 ? "cart.fill" : "cart")
+                    Image(systemName: selectedTab == 2 ? "cart.fill" : "cart")
                     Text("Cart")
                 }
-                .tag(3)
-            
+                .tag(2)
+
             ProfileView()
                 .tabItem {
-                    Image(systemName: selectedTab == 4 ? "person.fill" : "person")
+                    Image(systemName: selectedTab == 3 ? "person.fill" : "person")
                     Text("Profile")
                 }
-                .tag(4)
+                .tag(3)
         }
         .tint(.grocartGreen)
     }
