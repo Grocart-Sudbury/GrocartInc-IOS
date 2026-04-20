@@ -34,11 +34,17 @@ final class AddressRepository: @unchecked Sendable {
     private func handleFailure(_ response: DataResponse<Data, AFError>) throws -> Never {
         let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
         logger.error("FAILED: \(body)")
+        if let afError = response.error {
+            logger.error("AF ERROR: \(afError)")
+        }
         if let data = response.data,
            let errResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
             throw NetworkError.serverError(errResponse.displayMessage)
         }
         if response.response?.statusCode == 401 { throw NetworkError.unauthorized }
+        if response.error?.isSessionTaskError == true {
+            throw NetworkError.serverError("Network error. Please check your connection.")
+        }
         throw NetworkError.serverError("Something went wrong. Please try again.")
     }
 

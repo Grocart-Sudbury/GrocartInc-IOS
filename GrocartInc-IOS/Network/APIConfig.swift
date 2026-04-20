@@ -42,8 +42,15 @@ struct APIConfig {
         static let pricing = "\(baseURL)/cart/pricing"
     }
 
+    struct Customer {
+        static let profile = "\(baseURL)/customer/profile"
+        static let orders  = "\(baseURL)/customer/orders"
+    }
+
     struct Orders {
         static let place = "\(baseURL)/orders"
+        static func byId(_ id: Int) -> String { "\(baseURL)/orders/\(id)" }
+        static func track(_ trackingId: String) -> String { "\(baseURL)/orders/track/\(trackingId)" }
     }
 
     struct Products {
