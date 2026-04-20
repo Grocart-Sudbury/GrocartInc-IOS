@@ -6,11 +6,16 @@
 //
 
 import SwiftUI
+import os.log
+
+private let logger = Logger(subsystem: "com.grocartinc.ios", category: "CheckoutView")
 
 struct CheckoutView: View {
     @StateObject private var viewModel: CheckoutViewModel
     @ObservedObject private var cartManager = CartManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var isPaymentActive = false
+    @State private var showAddressSelector = false
 
     init(pricing: CartPricingResponse) {
         _viewModel = StateObject(wrappedValue: CheckoutViewModel(pricing: pricing))
@@ -32,7 +37,22 @@ struct CheckoutView: View {
                 .padding(.top, 8)
             }
 
-            // Error banner
+            NavigationLink(
+                destination: Group {
+                    if let order = viewModel.pendingPaymentOrder {
+                        PaymentView(order: order) { confirmedOrder in
+                            logger.info("✅ PaymentView onPaymentSuccess — orderId=\(confirmedOrder.id)")
+                            isPaymentActive = false
+                            viewModel.pendingPaymentOrder = nil
+                            viewModel.placedOrder = confirmedOrder
+                        }
+                    }
+                },
+                isActive: $isPaymentActive,
+                label: { EmptyView() }
+            )
+            .hidden()
+
             if let error = viewModel.errorMessage {
                 VStack {
                     HStack(spacing: 10) {
@@ -56,15 +76,15 @@ struct CheckoutView: View {
         .navigationTitle("Checkout")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) { placeOrderButton }
-        .fullScreenCover(item: $viewModel.activeCover) { cover in
-            switch cover {
-            case .confirmation(let order):
-                OrderConfirmationView(order: order)
-            case .payment(let order):
-                PaymentView(order: order) { confirmedOrder in
-                    viewModel.activeCover = .confirmation(confirmedOrder)
-                }
-            }
+        .onChange(of: viewModel.pendingPaymentOrder?.id) { orderId in
+            logger.info("🔄 pendingPaymentOrder changed → \(orderId?.description ?? "nil")")
+            if orderId != nil { isPaymentActive = true }
+        }
+        .fullScreenCover(item: $viewModel.placedOrder) { order in
+            OrderConfirmationView(order: order)
+        }
+        .sheet(isPresented: $showAddressSelector) {
+            AddressSelectorView(selectedAddress: $viewModel.selectedAddress)
         }
     }
 
@@ -82,7 +102,6 @@ struct CheckoutView: View {
         .padding(.bottom, 4)
     }
 
-    // MARK: - Card Container
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             content()
@@ -93,40 +112,26 @@ struct CheckoutView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - Text Field Style
-    private func styledField(_ placeholder: String, text: Binding<String>,
-                              keyboard: UIKeyboardType = .default) -> some View {
-        TextField(placeholder, text: text)
-            .keyboardType(keyboard)
-            .font(.system(size: 15))
-            .padding(12)
-            .background(Color.grocartBackground)
-            .cornerRadius(10)
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
-    }
-
     // MARK: - 1. Delivery Address
     private var deliveryAddressSection: some View {
         card {
-            sectionHeader("Delivery Address", icon: "mappin.circle.fill")
-
-            HStack(spacing: 10) {
-                styledField("First name", text: $viewModel.firstName)
-                styledField("Last name", text: $viewModel.lastName)
+            HStack {
+                sectionHeader("Delivery Address", icon: "mappin.circle.fill")
+                Spacer()
+                Button(action: { showAddressSelector = true }) {
+                    Text(viewModel.selectedAddress == nil ? "Add" : "Change")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.grocartGreen)
+                }
             }
 
-            styledField("Phone number", text: $viewModel.phone, keyboard: .phonePad)
-            styledField("Street address", text: $viewModel.address)
-
-            HStack(spacing: 10) {
-                styledField("City", text: $viewModel.city)
-                styledField("Province", text: $viewModel.province)
-                    .frame(maxWidth: 90)
+            if let addr = viewModel.selectedAddress {
+                selectedAddressCard(addr)
+            } else {
+                emptyAddressPrompt
             }
 
-            styledField("Postal code", text: $viewModel.postalCode)
-                .textInputAutocapitalization(.characters)
-
+            // Delivery notes always visible
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $viewModel.deliveryNotes)
                     .font(.system(size: 15))
@@ -146,12 +151,112 @@ struct CheckoutView: View {
         }
     }
 
+    private func selectedAddressCard(_ addr: CustomerAddress) -> some View {
+        Button(action: { showAddressSelector = true }) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.grocartGreen.opacity(0.1))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: labelIcon(for: addr.label))
+                        .font(.system(size: 17))
+                        .foregroundColor(.grocartGreen)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(addr.label)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.grocartPrimary)
+                        if addr.isDefault {
+                            Text("DEFAULT")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.grocartGreen)
+                                .tracking(0.5)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.grocartGreen.opacity(0.1)))
+                        }
+                    }
+                    Text(addr.fullName)
+                        .font(.system(size: 13))
+                        .foregroundColor(.grocartSecondary)
+                    Text(addr.displayAddress)
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary.opacity(0.8))
+                        .lineLimit(2)
+                    HStack(spacing: 4) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.grocartSecondary)
+                        Text(addr.phone)
+                            .font(.system(size: 12))
+                            .foregroundColor(.grocartSecondary.opacity(0.8))
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.grocartSecondary)
+            }
+            .padding(14)
+            .background(Color.grocartBackground)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.grocartGreen.opacity(0.3), lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var emptyAddressPrompt: some View {
+        Button(action: { showAddressSelector = true }) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.grocartGreen, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.grocartGreen)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Select a delivery address")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.grocartGreen)
+                    Text("Tap to add or choose a saved address")
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary)
+                }
+                Spacer()
+            }
+            .padding(14)
+            .background(Color.grocartGreen.opacity(0.04))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.grocartGreen.opacity(0.25), lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func labelIcon(for label: String) -> String {
+        switch label.lowercased() {
+        case "home":  return "house.fill"
+        case "work":  return "briefcase.fill"
+        default:      return "mappin.circle.fill"
+        }
+    }
+
     // MARK: - 2. Schedule
     private var scheduleSection: some View {
         card {
             sectionHeader("Delivery Schedule", icon: "clock.fill")
 
-            // Date pills
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(viewModel.availableDates, id: \.self) { date in
@@ -179,7 +284,6 @@ struct CheckoutView: View {
                 .foregroundColor(.grocartSecondary)
                 .padding(.top, 4)
 
-            // Time slot grid
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
                       spacing: 10) {
                 ForEach(DeliveryTimeSlot.allCases) { slot in
@@ -233,29 +337,21 @@ struct CheckoutView: View {
         card {
             sectionHeader("Payment Method", icon: "creditcard.fill")
 
-            HStack(spacing: 12) {
-                paymentOption(label: "Cash", icon: "banknote", value: "CASH")
-                paymentOption(label: "Credit Card", icon: "creditcard", value: "STRIPE")
-            }
-        }
-    }
-
-    private func paymentOption(label: String, icon: String, value: String) -> some View {
-        let isSelected = viewModel.paymentMethod == value
-        return Button(action: { viewModel.paymentMethod = value }) {
             HStack(spacing: 8) {
-                Image(systemName: icon)
+                Image(systemName: "creditcard.fill")
                     .font(.system(size: 15))
-                Text(label)
-                    .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(.grocartGreen)
+                Text("Credit Card")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.grocartPrimary)
             }
-            .foregroundColor(isSelected ? .white : .grocartPrimary)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 14)
-            .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
+            .padding(.horizontal, 12)
+            .background(Color.grocartGreen.opacity(0.08))
             .cornerRadius(12)
             .overlay(RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+                .stroke(Color.grocartGreen.opacity(0.4), lineWidth: 1.5))
         }
     }
 
@@ -264,7 +360,6 @@ struct CheckoutView: View {
         card {
             sectionHeader("Order Summary", icon: "list.bullet.rectangle")
 
-            // Items
             ForEach(cartManager.items) { item in
                 HStack(spacing: 10) {
                     Text("\(item.count)×")

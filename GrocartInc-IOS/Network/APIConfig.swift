@@ -50,6 +50,13 @@ struct APIConfig {
         static let categories = "\(baseURL)/categories"
     }
 
+    struct Addresses {
+        static let base = "\(baseURL)/customer/addresses"
+        static func byId(_ id: Int) -> String { "\(base)/\(id)" }
+        static let defaultAddress = "\(base)/default"
+        static func setDefault(_ id: Int) -> String { "\(base)/\(id)/default" }
+    }
+
     struct Payment {
         static let cards = "\(baseURL)/payment/cards"
         static let setupIntent = "\(baseURL)/payment/cards/setup-intent"

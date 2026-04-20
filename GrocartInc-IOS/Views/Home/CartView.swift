@@ -12,6 +12,8 @@ struct CartView: View {
     @StateObject private var viewModel = CartViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToCheckout = false
+    // Frozen at tap time — never cleared by cart/pricing resets while navigated
+    @State private var checkoutPricing: CartPricingResponse? = nil
 
     var body: some View {
         NavigationView {
@@ -23,6 +25,18 @@ struct CartView: View {
                 } else {
                     cartContent
                 }
+
+                // Always in the hierarchy with a frozen destination so the nav stack
+                // (CheckoutView → PaymentView) survives cart/pricing resets.
+                NavigationLink(
+                    destination: Group {
+                        if let pricing = checkoutPricing {
+                            CheckoutView(pricing: pricing)
+                        }
+                    },
+                    isActive: $navigateToCheckout
+                ) { EmptyView() }
+                    .hidden()
             }
             .navigationTitle("My Cart")
             .navigationBarTitleDisplayMode(.inline)
@@ -233,12 +247,9 @@ struct CartView: View {
     // MARK: - Place Order Button
     private var placeOrderButton: some View {
         VStack(spacing: 0) {
-            if let pricing = viewModel.pricing {
-                NavigationLink(destination: CheckoutView(pricing: pricing),
-                               isActive: $navigateToCheckout) { EmptyView() }
-            }
             Button(action: {
-                guard viewModel.pricing != nil else { return }
+                guard let pricing = viewModel.pricing else { return }
+                checkoutPricing = pricing   // freeze before cart is cleared
                 navigateToCheckout = true
             }) {
                 HStack {

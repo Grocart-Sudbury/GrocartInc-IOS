@@ -7,70 +7,83 @@
 
 import SwiftUI
 import StripePayments
+import os.log
+
+private let logger = Logger(subsystem: "com.grocartinc.ios", category: "PaymentView")
 
 struct PaymentView: View {
     @StateObject private var viewModel: PaymentViewModel
-    @Environment(\.dismiss) private var dismiss
     @State private var showAddCard = false
+    private let onPaymentSuccess: (OrderResponse) -> Void
 
     init(order: OrderResponse, onPaymentSuccess: @escaping (OrderResponse) -> Void) {
-        let vm = PaymentViewModel(order: order)
-        vm.onPaymentSuccess = onPaymentSuccess
-        _viewModel = StateObject(wrappedValue: vm)
+        self.onPaymentSuccess = onPaymentSuccess
+        _viewModel = StateObject(wrappedValue: PaymentViewModel(order: order))
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.grocartBackground.ignoresSafeArea()
+        ZStack {
+            Color.grocartBackground.ignoresSafeArea()
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        orderAmountHeader
-                        savedCardsSection
-                        Spacer().frame(height: 90)
-                    }
-                    .padding(.top, 8)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    orderAmountHeader
+                    savedCardsSection
+                    Spacer().frame(height: 90)
                 }
+                .padding(.top, 8)
+            }
 
-                // Error banner
-                if let error = viewModel.errorMessage {
-                    VStack {
-                        HStack(spacing: 10) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.white)
-                            Text(error)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.white)
-                                .multilineTextAlignment(.leading)
-                            Spacer()
-                        }
-                        .padding(14)
-                        .background(Color.red.opacity(0.9))
-                        .cornerRadius(12)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
+            // Error banner
+            if let error = viewModel.errorMessage {
+                VStack {
+                    HStack(spacing: 10) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.white)
+                        Text(error)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.leading)
                         Spacer()
                     }
+                    .padding(14)
+                    .background(Color.red.opacity(0.9))
+                    .cornerRadius(12)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    Spacer()
                 }
             }
-            .navigationTitle("Payment")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Back") { dismiss() }
-                        .foregroundColor(.grocartGreen)
-                        .disabled(viewModel.isProcessing)
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) { payButton }
-            .onAppear { viewModel.loadCards() }
-            .sheet(isPresented: $showAddCard) {
-                AddCardView(viewModel: viewModel)
-            }
-            .sheet(item: $viewModel.requiresAction) { action in
-                ThreeDSHandlerView(action: action, viewModel: viewModel)
-            }
+        }
+        .navigationTitle("Payment")
+        .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom, spacing: 0) { payButton }
+        .onAppear {
+            logger.info("👁️ PaymentView appeared — orderId=\(viewModel.order.id)")
+            viewModel.loadCards()
+        }
+        .onDisappear {
+            logger.info("👻 PaymentView disappeared — paymentComplete=\(viewModel.paymentComplete) isProcessing=\(viewModel.isProcessing)")
+        }
+        .onChange(of: showAddCard) { val in
+            logger.info("📋 showAddCard → \(val)")
+        }
+        .onChange(of: viewModel.paymentComplete) { val in
+            logger.info("✅ paymentComplete onChange → \(val)")
+            if val { onPaymentSuccess(viewModel.order) }
+        }
+        .onChange(of: viewModel.requiresAction) { val in
+            logger.info("🔐 requiresAction onChange → \(val == nil ? "nil" : "SET")")
+        }
+        .sheet(isPresented: $showAddCard, onDismiss: {
+            logger.info("📋 AddCardView sheet dismissed")
+        }) {
+            AddCardView(viewModel: viewModel)
+        }
+        .sheet(item: $viewModel.requiresAction, onDismiss: {
+            logger.info("🔐 ThreeDSHandlerView sheet dismissed")
+        }) { action in
+            ThreeDSHandlerView(action: action, viewModel: viewModel)
         }
     }
 

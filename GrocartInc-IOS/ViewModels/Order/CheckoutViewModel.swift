@@ -8,21 +8,15 @@
 import Foundation
 import Combine
 
-enum CheckoutCover: Identifiable {
-    case confirmation(OrderResponse)
-    case payment(OrderResponse)
-    var id: String {
-        switch self {
-        case .confirmation(let o): return "confirm-\(o.id)"
-        case .payment(let o):      return "payment-\(o.id)"
-        }
-    }
-}
-
 @MainActor
 final class CheckoutViewModel: ObservableObject {
 
-    // MARK: - Delivery Info
+    // MARK: - Selected Address
+    @Published var selectedAddress: CustomerAddress? = nil {
+        didSet { applyAddress(selectedAddress) }
+    }
+
+    // MARK: - Delivery Info (populated from selectedAddress)
     @Published var firstName = ""
     @Published var lastName = ""
     @Published var email = ""
@@ -39,17 +33,19 @@ final class CheckoutViewModel: ObservableObject {
 
     // MARK: - Tip & Payment
     @Published var tipAmount: Double = 0
-    @Published var paymentMethod: String = "CASH"
+    @Published var paymentMethod: String = "STRIPE"
 
     // MARK: - State
     @Published var isPlacingOrder = false
     @Published var errorMessage: String? = nil
-    @Published var activeCover: CheckoutCover? = nil
+    @Published var placedOrder: OrderResponse? = nil
+    @Published var pendingPaymentOrder: OrderResponse? = nil
 
     // MARK: - Dependencies
     let pricing: CartPricingResponse
     private let cartManager = CartManager.shared
     private let repository = OrderRepository.shared
+    private let addressRepo = AddressRepository.shared
 
     // MARK: - Computed
     var totalWithTip: Double { pricing.total + tipAmount }
@@ -60,30 +56,57 @@ final class CheckoutViewModel: ObservableObject {
     }
 
     var isFormValid: Bool {
-        !firstName.isEmpty && !lastName.isEmpty && !email.isEmpty &&
-        !phone.isEmpty && !address.isEmpty && !city.isEmpty &&
-        !postalCode.isEmpty && selectedSlot != nil
+        selectedAddress != nil && selectedSlot != nil
     }
 
     // MARK: - Init
     init(pricing: CartPricingResponse) {
         self.pricing = pricing
         prefill()
+        loadDefaultAddress()
     }
 
     private func prefill() {
         let user = SessionManager.shared.currentUser
-        firstName  = user?.firstName ?? ""
-        lastName   = user?.lastName  ?? ""
-        email      = user?.email     ?? ""
-        city       = LocationState.shared.cityName
-            .replacingOccurrences(of: "Greater ", with: "")  // keep full name for display
+        firstName = user?.firstName ?? ""
+        lastName  = user?.lastName  ?? ""
+        email     = user?.email     ?? ""
+        city      = LocationState.shared.cityName
+            .replacingOccurrences(of: "Greater ", with: "")
+    }
+
+    private func applyAddress(_ addr: CustomerAddress?) {
+        guard let a = addr else { return }
+        firstName  = a.firstName
+        lastName   = a.lastName
+        phone      = a.phone
+        address    = a.address
+        city       = a.city
+        province   = a.province
+        postalCode = a.postalCode
+        // Preserve user email from session
+        if email.isEmpty {
+            email = SessionManager.shared.currentUser?.email ?? ""
+        }
+    }
+
+    private func loadDefaultAddress() {
+        Task {
+            do {
+                let all = try await addressRepo.fetchAll()
+                if let def = all.first(where: { $0.isDefault }) ?? all.first {
+                    selectedAddress = def
+                }
+            } catch {
+                // Silently fall through — user can still pick manually
+            }
+        }
     }
 
     // MARK: - Place Order
     func placeOrder() {
         guard isFormValid, let slot = selectedSlot else {
-            errorMessage = "Please fill in all required fields and select a delivery time."
+            errorMessage = "Please select a delivery address and time slot."
             return
         }
         guard let store = cartManager.store else { return }
@@ -137,10 +160,8 @@ final class CheckoutViewModel: ObservableObject {
             do {
                 let result = try await repository.placeOrder(request)
                 cartManager.clear()
-                isPlacingOrder = false          // settle state before triggering cover
-                activeCover = paymentMethod == "STRIPE"
-                    ? .payment(result)
-                    : .confirmation(result)
+                isPlacingOrder = false
+                pendingPaymentOrder = result
             } catch let error as NetworkError {
                 errorMessage = error.errorDescription
                 isPlacingOrder = false
