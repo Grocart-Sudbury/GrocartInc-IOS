@@ -25,7 +25,21 @@ final class StoreRepository: @unchecked Sendable {
 
     private init() {}
 
-    func fetchActiveStores(city: String) async throws -> [Store] {
+    private func cacheKey(for city: String) -> String {
+        "stores_\(city.lowercased().replacingOccurrences(of: " ", with: "_"))"
+    }
+
+    func fetchActiveStores(city: String, forceRefresh: Bool = false) async throws -> [Store] {
+        let key = cacheKey(for: city)
+        let cache = CacheManager.shared
+
+        if !forceRefresh,
+           cache.isValid(forKey: key, ttl: APIConfig.storeCacheTTL),
+           let cached = cache.load([Store].self, forKey: key) {
+            logger.info("Returning cached stores for city: \(city)")
+            return cached
+        }
+
         logger.info("Fetching active stores for city: \(city)")
 
         let task = session.request(
@@ -45,7 +59,9 @@ final class StoreRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW RESPONSE: \(raw.prefix(500))")
             do {
-                return try JSONDecoder().decode([Store].self, from: data)
+                let stores = try JSONDecoder().decode([Store].self, from: data)
+                cache.save(stores, forKey: key)
+                return stores
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)

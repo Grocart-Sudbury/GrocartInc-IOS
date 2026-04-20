@@ -107,7 +107,7 @@ final class HomeViewModel: ObservableObject {
     func refresh() async {
         isRefreshing = true
         errorMessage = nil
-        
+
         do {
             let fresh = try await productRepository.fetchCategories(forceRefresh: true)
             self.categories = fresh
@@ -116,15 +116,20 @@ final class HomeViewModel: ObservableObject {
         } catch {
             self.errorMessage = "Something went wrong. Please try again."
         }
-        
+
+        let city = LocationState.shared.cityName
+        if !city.isEmpty, city != "Locating...", city != "Location Off" {
+            await loadStores(city: city, forceRefresh: true)
+        }
+
         isRefreshing = false
     }
-    
+
     // MARK: - Load Stores
-    func loadStores(city: String) async {
+    func loadStores(city: String, forceRefresh: Bool = false) async {
         isLoadingStores = true
         do {
-            stores = try await storeRepository.fetchActiveStores(city: city)
+            stores = try await storeRepository.fetchActiveStores(city: city, forceRefresh: forceRefresh)
         } catch {
             // Silently fail — stores list just stays empty
         }

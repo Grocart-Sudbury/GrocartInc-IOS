@@ -83,4 +83,5 @@ struct APIConfig {
     static let requestTimeout: TimeInterval = 30
     static let resourceTimeout: TimeInterval = 60
     static let categoryCacheTTL: TimeInterval = 30 * 60
+    static let storeCacheTTL: TimeInterval = 60 * 60
 }
