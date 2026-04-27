@@ -24,7 +24,7 @@ struct CustomerAddress: Codable, Identifiable {
     }
 }
 
-struct AddressRequest: Encodable {
+struct AddressRequest: Sendable {
     let label: String
     let firstName: String
     let lastName: String
@@ -34,6 +34,25 @@ struct AddressRequest: Encodable {
     let province: String
     let postalCode: String
     let isDefault: Bool
+}
+
+extension AddressRequest: Encodable {
+    private enum CodingKeys: String, CodingKey {
+        case label, firstName, lastName, phone, address, city, province, postalCode, isDefault
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(label,      forKey: .label)
+        try c.encode(firstName,  forKey: .firstName)
+        try c.encode(lastName,   forKey: .lastName)
+        try c.encode(phone,      forKey: .phone)
+        try c.encode(address,    forKey: .address)
+        try c.encode(city,       forKey: .city)
+        try c.encode(province,   forKey: .province)
+        try c.encode(postalCode, forKey: .postalCode)
+        try c.encode(isDefault,  forKey: .isDefault)
+    }
 }
 
 struct AddressListResponse: Decodable {

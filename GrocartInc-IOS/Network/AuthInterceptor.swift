@@ -15,45 +15,45 @@
 import Foundation
 import Alamofire
 
-final class AuthInterceptor: RequestInterceptor {
-    
-    static let shared = AuthInterceptor()
-    
+final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
+
+    nonisolated(unsafe) static let shared = AuthInterceptor()
+
     private init() {}
-    
+
     // MARK: - Adapt (Add token to requests)
-    func adapt(_ urlRequest: URLRequest, for session: Session, completion: @escaping (Result<URLRequest, Error>) -> Void) {
+    nonisolated func adapt(_ urlRequest: URLRequest, for session: Session, completion: @escaping @Sendable (Result<URLRequest, Error>) -> Void) {
         var request = urlRequest
-        
-        if let token = SessionManager.shared.authToken {
+
+        if let token = KeychainManager.shared.get(key: KeychainManager.Keys.authToken) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        
+
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
+
         completion(.success(request))
     }
-    
+
     // MARK: - Retry (Handle 401 by logging out)
-    func retry(_ request: Request, for session: Session, dueTo error: Error, completion: @escaping (RetryResult) -> Void) {
+    nonisolated func retry(_ request: Request, for session: Session, dueTo error: Error, completion: @escaping @Sendable (RetryResult) -> Void) {
         guard let statusCode = request.response?.statusCode, statusCode == 401 else {
             completion(.doNotRetry)
             return
         }
-        
+
         // Token expired — clear session and force re-login
         DispatchQueue.main.async {
             SessionManager.shared.clearSession()
         }
-        
+
         completion(.doNotRetry)
     }
 }
 
 // MARK: - Authenticated Session (Use this for all authenticated API calls)
 extension Session {
-    static let authenticated: Session = {
+    nonisolated(unsafe) static let authenticated: Session = {
         let configuration = URLSessionConfiguration.af.default
         configuration.timeoutIntervalForRequest = APIConfig.requestTimeout
         configuration.timeoutIntervalForResource = APIConfig.resourceTimeout

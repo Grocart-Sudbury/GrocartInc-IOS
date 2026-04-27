@@ -5,24 +5,16 @@ import Foundation
 @preconcurrency import Alamofire
 import os.log
 
-private let logger = Logger(subsystem: "com.grocartinc.ios", category: "AddressRepository")
+nonisolated(unsafe) private let logger = Logger(subsystem: "com.grocartinc.ios", category: "AddressRepository")
 
 final class AddressRepository: @unchecked Sendable {
 
-    static let shared = AddressRepository()
+    nonisolated(unsafe) static let shared = AddressRepository()
     private init() {}
 
     // MARK: - Helpers
 
-    private func encode(_ request: some Encodable) throws -> [String: Any] {
-        let data = try JSONEncoder().encode(request)
-        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw NetworkError.unknown(NSError(domain: "AddressRepository", code: -1))
-        }
-        return dict
-    }
-
-    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+    nonisolated private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
@@ -31,7 +23,7 @@ final class AddressRepository: @unchecked Sendable {
         }
     }
 
-    private func handleFailure(_ response: DataResponse<Data, AFError>) throws -> Never {
+    nonisolated private func handleFailure(_ response: DataResponse<Data, AFError>) throws -> Never {
         let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
         logger.error("FAILED: \(body)")
         if let afError = response.error {
@@ -50,7 +42,7 @@ final class AddressRepository: @unchecked Sendable {
 
     // MARK: - API Methods
 
-    func fetchAll() async throws -> [CustomerAddress] {
+    nonisolated func fetchAll() async throws -> [CustomerAddress] {
         logger.info("GET /customer/addresses")
         let task = Session.authenticated
             .request(APIConfig.Addresses.base, method: .get)
@@ -73,12 +65,23 @@ final class AddressRepository: @unchecked Sendable {
         }
     }
 
-    func add(_ request: AddressRequest) async throws -> CustomerAddress {
-        logger.info("POST /customer/addresses — label:\(request.label)")
-        let params = try encode(request)
+    nonisolated private func makeJSONRequest(url: String, method: String, body: AddressRequest) throws -> URLRequest {
+        guard let u = URL(string: url) else {
+            throw NetworkError.unknown(NSError(domain: "AddressRepository", code: -2))
+        }
+        var req = URLRequest(url: u)
+        req.httpMethod = method
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpBody = try JSONEncoder().encode(body)
+        return req
+    }
+
+    nonisolated func add(_ request: AddressRequest) async throws -> CustomerAddress {
+       
+        let urlRequest = try makeJSONRequest(url: APIConfig.Addresses.base, method: "POST", body: request)
         let task = Session.authenticated
-            .request(APIConfig.Addresses.base, method: .post,
-                     parameters: params, encoding: JSONEncoding.default)
+            .request(urlRequest)
             .validate(statusCode: 200..<300)
             .serializingData()
 
@@ -91,12 +94,11 @@ final class AddressRepository: @unchecked Sendable {
         }
     }
 
-    func update(id: Int, request: AddressRequest) async throws -> CustomerAddress {
+    nonisolated func update(id: Int, request: AddressRequest) async throws -> CustomerAddress {
         logger.info("PUT /customer/addresses/\(id)")
-        let params = try encode(request)
+        let urlRequest = try makeJSONRequest(url: APIConfig.Addresses.byId(id), method: "PUT", body: request)
         let task = Session.authenticated
-            .request(APIConfig.Addresses.byId(id), method: .put,
-                     parameters: params, encoding: JSONEncoding.default)
+            .request(urlRequest)
             .validate(statusCode: 200..<300)
             .serializingData()
 
@@ -109,7 +111,7 @@ final class AddressRepository: @unchecked Sendable {
         }
     }
 
-    func setDefault(id: Int) async throws {
+    nonisolated func setDefault(id: Int) async throws {
         logger.info("PATCH /customer/addresses/\(id)/default")
         let task = Session.authenticated
             .request(APIConfig.Addresses.setDefault(id), method: .patch)
@@ -123,7 +125,7 @@ final class AddressRepository: @unchecked Sendable {
         }
     }
 
-    func delete(id: Int) async throws {
+    nonisolated func delete(id: Int) async throws {
         logger.info("DELETE /customer/addresses/\(id)")
         let task = Session.authenticated
             .request(APIConfig.Addresses.byId(id), method: .delete)
