@@ -107,6 +107,7 @@ struct HomeTabView: View {
         .confirmationDialog("Choose Your City", isPresented: $showCityPicker, titleVisibility: .visible) {
             Button("Sudbury") { locationState.cityName = "Sudbury" }
             Button("Timmins") { locationState.cityName = "Timmins" }
+            Button("Manitoba") { locationState.cityName = "Manitoba" }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Location access is off. Select your delivery city.")

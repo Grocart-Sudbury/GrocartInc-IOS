@@ -10,10 +10,12 @@
 		8E26C2E72F3AFA380017AB53 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = 8E26C2E62F3AFA380017AB53 /* Alamofire */; };
 		DA230E112F935D9800179F98 /* StripePayments in Frameworks */ = {isa = PBXBuildFile; productRef = DA230E102F935D9800179F98 /* StripePayments */; };
 		DA230E132F935D9800179F98 /* StripePaymentsUI in Frameworks */ = {isa = PBXBuildFile; productRef = DA230E122F935D9800179F98 /* StripePaymentsUI */; };
+		DAED2C852F9C81CC0065438D /* grocart.icon in Resources */ = {isa = PBXBuildFile; fileRef = DAED2C842F9C81CC0065438D /* grocart.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		DA50AED52F32E2E90090D573 /* GrocartInc-IOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "GrocartInc-IOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DAED2C842F9C81CC0065438D /* grocart.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = grocart.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -56,6 +58,7 @@
 			children = (
 				DA50AED72F32E2E90090D573 /* GrocartInc-IOS */,
 				DA50AED62F32E2E90090D573 /* Products */,
+				DAED2C842F9C81CC0065438D /* grocart.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -138,6 +141,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DAED2C852F9C81CC0065438D /* grocart.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,11 +282,11 @@
 		DA50AEE62F32E2EA0090D573 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = grocart;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WF8K26FAT3;
+				DEVELOPMENT_TEAM = 2G2B87NX43;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "GrocartInc-IOS/Info.plist";
@@ -307,11 +311,11 @@
 		DA50AEE72F32E2EA0090D573 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = grocart;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WF8K26FAT3;
+				DEVELOPMENT_TEAM = 2G2B87NX43;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "GrocartInc-IOS/Info.plist";

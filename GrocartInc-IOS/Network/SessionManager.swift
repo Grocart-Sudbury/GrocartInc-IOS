@@ -46,12 +46,13 @@ final class SessionManager: ObservableObject {
             UserDefaults.standard.set(userData, forKey: "current_user")
         }
         
+        resetLocationCache()
         DispatchQueue.main.async {
             self.currentUser = user
             self.isLoggedIn = true
         }
     }
-    
+
     // MARK: - Save Session (OTP)
     func saveSession(from response: OTPVerifyResponse) {
         guard let token = response.token, let customer = response.customer else { return }
@@ -72,6 +73,7 @@ final class SessionManager: ObservableObject {
             UserDefaults.standard.set(userData, forKey: "current_user")
         }
 
+        resetLocationCache()
         DispatchQueue.main.async {
             self.currentUser = user
             self.isLoggedIn = true
@@ -116,6 +118,16 @@ final class SessionManager: ObservableObject {
         return KeychainManager.shared.get(key: KeychainManager.Keys.authToken)
     }
     
+    // MARK: - Location Cache Reset
+    private func resetLocationCache() {
+        UserDefaults.standard.removeObject(forKey: "grocart.selectedCity")
+        CacheManager.shared.clearAll()
+        DispatchQueue.main.async {
+            LocationState.shared.cityName = "Locating..."
+            LocationManager.shared.resetAndRequestLocation()
+        }
+    }
+
     // MARK: - Token Expiry Check
     private func isTokenExpired(_ token: String) -> Bool {
         let parts = token.split(separator: ".")

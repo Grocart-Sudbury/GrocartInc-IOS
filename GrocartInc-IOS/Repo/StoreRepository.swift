@@ -41,6 +41,7 @@ final class StoreRepository: @unchecked Sendable {
         }
 
         logger.info("Fetching active stores for city: \(city)")
+        logger.info("REQUEST: GET \(APIConfig.Stores.active)?city=\(city)")
 
         let task = session.request(
             APIConfig.Stores.active,
@@ -57,7 +58,8 @@ final class StoreRepository: @unchecked Sendable {
         switch response.result {
         case .success(let data):
             let raw = String(data: data, encoding: .utf8) ?? "nil"
-            logger.debug("RAW RESPONSE: \(raw.prefix(500))")
+            logger.info("STATUS CODE: \(response.response?.statusCode ?? -1)")
+            logger.info("RAW RESPONSE: \(raw.prefix(500))")
             do {
                 let stores = try JSONDecoder().decode([Store].self, from: data)
                 cache.save(stores, forKey: key)

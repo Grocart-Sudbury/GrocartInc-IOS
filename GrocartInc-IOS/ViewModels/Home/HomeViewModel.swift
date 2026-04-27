@@ -51,12 +51,14 @@ final class HomeViewModel: ObservableObject {
         self.productRepository = productRepository ?? ProductRepository.shared
         self.storeRepository = StoreRepository.shared
 
-        // Re-fetch stores whenever the city resolves or changes
+        // Re-fetch stores whenever the city resolves or changes.
+        // Use `scan` to track whether we passed through "Locating..." so that
+        // re-login always triggers a fresh fetch even when the city is the same.
         LocationState.shared.$cityName
-            .filter { city in
-                !city.isEmpty && city != "Locating..." && city != "Location Off"
-            }
-            .removeDuplicates()
+            .scan((prev: "", current: "")) { state, city in (state.current, city) }
+            .filter { _, city in !city.isEmpty && city != "Locating..." && city != "Location Off" }
+            .filter { prev, city in prev != city || prev == "Locating..." || prev == "" }
+            .map { _, city in city }
             .sink { [weak self] city in
                 Task { await self?.loadStores(city: city) }
             }

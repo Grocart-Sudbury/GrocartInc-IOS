@@ -30,7 +30,6 @@ final class LocationManager: NSObject {
 
     private let clManager = CLLocationManager()
     private let geocoder = CLGeocoder()
-    private var hasFetchedCity = false
     private let state = LocationState.shared
 
     override init() {
@@ -50,7 +49,8 @@ final class LocationManager: NSObject {
         case .notDetermined:
             clManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
-            fetchCityIfNeeded()
+            print("[LocationManager] Requesting fresh location")
+            clManager.requestLocation()
         case .denied, .restricted:
             DispatchQueue.main.async { self.state.cityName = "Location Off" }
         @unknown default:
@@ -58,16 +58,17 @@ final class LocationManager: NSObject {
         }
     }
 
-    private func fetchCityIfNeeded() {
-        guard !hasFetchedCity else { return }
-        hasFetchedCity = true
-        clManager.requestLocation()
+    func resetAndRequestLocation() {
+        print("[LocationManager] Cache cleared — requesting fresh location")
+        requestLocationIfNeeded()
     }
 
     private func reverseGeocode(_ location: CLLocation) {
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, _ in
+        print("[LocationManager] Reverse geocoding location: \(location.coordinate)")
+        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             guard let self else { return }
             let city = placemarks?.first?.locality ?? "Unknown Location"
+            print("[LocationManager] Geocode result: \(city)")
             DispatchQueue.main.async { self.state.cityName = city }
         }
     }
@@ -79,7 +80,8 @@ extension LocationManager: CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
-            fetchCityIfNeeded()
+            print("[LocationManager] Requesting fresh location")
+            manager.requestLocation()
         case .denied, .restricted:
             DispatchQueue.main.async { self.state.cityName = "Location Off" }
         default:
