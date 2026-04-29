@@ -81,21 +81,9 @@ final class CustomerRepository: @unchecked Sendable {
     // MARK: - Orders
 
     func getOrders() async throws -> [CustomerOrderSummary] {
-        logger.info("GET /customer/orders")
-        let task = Session.authenticated
-            .request(APIConfig.Customer.orders, method: .get)
-            .validate(statusCode: 200..<300)
-            .serializingData()
-
-        let response = await task.response
-        switch response.result {
-        case .success(let data):
-            let raw = String(data: data, encoding: .utf8) ?? "nil"
-            logger.debug("RAW: \(raw.prefix(500))")
-            return try decode([CustomerOrderSummary].self, from: data)
-        case .failure:
-            try handleFailure(response)
-        }
+        logger.info("GET /customer/profile (orders)")
+        let profile = try await getProfile()
+        return profile.previousOrders ?? []
     }
 
     func getOrder(id: Int) async throws -> CustomerOrderDetail {

@@ -110,7 +110,10 @@ struct OrderConfirmationView: View {
                     .padding(.bottom, 40)
 
                     // Done button
-                    Button(action: { dismiss() }) {
+                    Button(action: {
+                        dismiss()
+                        NotificationCenter.default.post(name: .navigateToHome, object: nil)
+                    }) {
                         Text("Back to Home")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.white)
@@ -158,3 +161,7 @@ struct OrderConfirmationView: View {
 
 // Make OrderResponse conform to Identifiable for fullScreenCover(item:)
 extension OrderResponse: Identifiable {}
+
+extension Notification.Name {
+    static let navigateToHome = Notification.Name("com.grocartinc.navigateToHome")
+}

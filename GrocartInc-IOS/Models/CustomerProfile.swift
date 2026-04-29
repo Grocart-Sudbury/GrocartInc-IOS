@@ -10,6 +10,7 @@ struct CustomerProfile: Decodable {
     let email: String
     let phone: String?
     let active: Bool?
+    let previousOrders: [CustomerOrderSummary]?
 
     var fullName: String { "\(firstName) \(lastName)" }
 }

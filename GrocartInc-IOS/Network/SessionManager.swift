@@ -21,6 +21,7 @@ final class SessionManager: ObservableObject {
     
     @Published var isLoggedIn: Bool = false
     @Published var currentUser: User?
+    @Published var sessionExpired: Bool = false
     
     private init() {
         loadSession()
@@ -102,6 +103,14 @@ final class SessionManager: ObservableObject {
         isLoggedIn = true
     }
     
+    // MARK: - Expire Session (401 — show alert before clearing)
+    func expireSession() {
+        guard !sessionExpired else { return }
+        DispatchQueue.main.async {
+            self.sessionExpired = true
+        }
+    }
+
     // MARK: - Clear Session
     func clearSession() {
         KeychainManager.shared.clearAll()

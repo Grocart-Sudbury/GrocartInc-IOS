@@ -42,10 +42,8 @@ final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
             return
         }
 
-        // Token expired — clear session and force re-login
-        DispatchQueue.main.async {
-            SessionManager.shared.clearSession()
-        }
+        // Token expired — show alert before forcing re-login
+        SessionManager.shared.expireSession()
 
         completion(.doNotRetry)
     }

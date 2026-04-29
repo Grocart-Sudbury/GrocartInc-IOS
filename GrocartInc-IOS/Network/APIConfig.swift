@@ -44,7 +44,6 @@ struct APIConfig {
 
     struct Customer {
         static let profile = "\(baseURL)/customer/profile"
-        static let orders  = "\(baseURL)/customer/orders"
     }
 
     struct Orders {

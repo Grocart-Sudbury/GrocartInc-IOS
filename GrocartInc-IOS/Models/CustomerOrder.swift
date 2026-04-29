@@ -65,15 +65,30 @@ struct CustomerOrderSummary: Decodable, Identifiable {
     let preferredDeliveryTimeSlot: String?
     let items: [CustomerOrderItemSummary]?
 
+    enum CodingKeys: String, CodingKey {
+        case id = "orderId"
+        case trackingId, status, total, createdAt
+        case preferredDeliveryDate, preferredDeliveryTimeSlot, items
+    }
+
     var formattedTotal: String { String(format: "$%.2f", total) }
 
     var formattedDate: String {
+        // LocalDateTime format from backend: "2026-04-28T10:00:00"
+        let local = DateFormatter()
+        local.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        if let date = local.date(from: createdAt) {
+            let out = DateFormatter(); out.dateStyle = .medium
+            return out.string(from: date)
+        }
+        // Fallback: ISO8601 with timezone
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = iso.date(from: createdAt) else { return createdAt }
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        return f.string(from: date)
+        if let date = iso.date(from: createdAt) {
+            let out = DateFormatter(); out.dateStyle = .medium
+            return out.string(from: date)
+        }
+        return createdAt
     }
 
     var itemCount: Int { items?.count ?? 0 }

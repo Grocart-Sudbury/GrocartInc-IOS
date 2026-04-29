@@ -26,5 +26,13 @@ struct RootView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: sessionManager.isLoggedIn)
         .animation(.easeInOut(duration: 0.3), value: hasCompletedOnboarding)
+        .alert("Session Expired", isPresented: $sessionManager.sessionExpired) {
+            Button("Sign In") {
+                sessionManager.sessionExpired = false
+                sessionManager.clearSession()
+            }
+        } message: {
+            Text("Your session has expired. Please sign in again.")
+        }
     }
 }

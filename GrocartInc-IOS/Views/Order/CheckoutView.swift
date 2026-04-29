@@ -80,7 +80,9 @@ struct CheckoutView: View {
             logger.info("🔄 pendingPaymentOrder changed → \(orderId?.description ?? "nil")")
             if orderId != nil { isPaymentActive = true }
         }
-        .fullScreenCover(item: $viewModel.placedOrder) { order in
+        .fullScreenCover(item: $viewModel.placedOrder, onDismiss: {
+            dismiss()
+        }) { order in
             OrderConfirmationView(order: order)
         }
         .sheet(isPresented: $showAddressSelector) {

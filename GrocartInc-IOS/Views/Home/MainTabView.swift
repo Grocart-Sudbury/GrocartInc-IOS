@@ -41,6 +41,9 @@ struct MainTabView: View {
                 .tag(3)
         }
         .tint(.grocartGreen)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToHome)) { _ in
+            selectedTab = 0
+        }
     }
 }
 
