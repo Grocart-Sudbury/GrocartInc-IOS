@@ -54,74 +54,31 @@ struct MyCouponsView: View {
     var body: some View {
         ZStack {
             Color.grocartBackground.ignoresSafeArea()
-            
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // Header Card
-                    VStack(spacing: 8) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.orange.opacity(0.12))
-                                .frame(width: 64, height: 64)
-                            
-                            Image(systemName: "ticket.fill")
-                                .font(.system(size: 26))
-                                .foregroundColor(.orange)
-                        }
-                        
-                        Text("You have \(coupons.count) coupons")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.grocartSecondary)
-                        
-                        Text("Scratch to reveal your rewards!")
-                            .font(.system(size: 13))
-                            .foregroundColor(.grocartSecondary.opacity(0.7))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                    .background(Color.grocartSecondaryBackground)
-                    .cornerRadius(16)
-                    .padding(.horizontal, 20)
-                    
-                    // Coupon Cards
-                    VStack(spacing: 14) {
-                        ForEach(Array(coupons.enumerated()), id: \.element.id) { index, coupon in
-                            CouponCard(coupon: coupon) {
-                                selectedCoupon = coupon
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    showScratchCard = true
-                                }
-                            }
-                            .transition(.asymmetric(
-                                insertion: .move(edge: .trailing).combined(with: .opacity),
-                                removal: .move(edge: .leading).combined(with: .opacity)
-                            ))
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    Spacer(minLength: 40)
+
+            VStack(spacing: 16) {
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.10))
+                        .frame(width: 80, height: 80)
+                    Image(systemName: "ticket")
+                        .font(.system(size: 34))
+                        .foregroundColor(.orange.opacity(0.6))
                 }
-                .padding(.top, 10)
+
+                Text("No coupons right now")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(.grocartPrimary)
+
+                Text("Sorry, there are no coupons available\nat the moment. Check back later!")
+                    .font(.system(size: 14))
+                    .foregroundColor(.grocartSecondary)
+                    .multilineTextAlignment(.center)
+
+                Spacer()
             }
-            
-            // Scratch Card Overlay
-            if showScratchCard, let coupon = selectedCoupon {
-                ScratchCardOverlay(
-                    coupon: coupon,
-                    onDismiss: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            showScratchCard = false
-                        }
-                        // Mark coupon as scratched
-                        if let idx = coupons.firstIndex(where: { $0.id == coupon.id }) {
-                            coupons[idx].isScratched = true
-                        }
-                        selectedCoupon = nil
-                    }
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.92)))
-            }
+            .padding(.horizontal, 40)
         }
         .navigationTitle("My Coupons")
         .navigationBarTitleDisplayMode(.large)

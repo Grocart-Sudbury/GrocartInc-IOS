@@ -133,7 +133,6 @@ final class SessionManager: ObservableObject {
         CacheManager.shared.clearAll()
         DispatchQueue.main.async {
             LocationState.shared.cityName = "Locating..."
-            LocationManager.shared.resetAndRequestLocation()
         }
     }
 

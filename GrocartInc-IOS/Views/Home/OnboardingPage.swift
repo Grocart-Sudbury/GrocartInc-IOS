@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 // MARK: - Onboarding Data Model
 struct OnboardingPage: Identifiable {
@@ -40,20 +41,20 @@ struct OnboardingView: View {
             features: [
                 OnboardingFeature(icon: "calendar.badge.clock", text: "Fresh daily discounts on top items"),
                 OnboardingFeature(icon: "cart.fill.badge.plus", text: "Buy more, save more bundles"),
-                OnboardingFeature(icon: "star.fill", text: "Loyalty points on every order")
+                OnboardingFeature(icon: "arrow.counterclockwise.circle.fill", text: "Reorder your favourites in one tap")
             ],
             gradientColors: [Color.grocartGreen, Color.grocartGreen.opacity(0.7)]
         ),
         OnboardingPage(
-            icon: "gift.fill",
-            iconSecondary: "sparkles",
-            title: "App-Exclusive\nDeals & Offers",
-            subtitle: "Unlock special offers you won't find anywhere else. Exclusive to the GroCart app — our way of rewarding you for shopping smart.",
-            highlight: "Up to 40% off app-only deals",
+            icon: "location.fill",
+            iconSecondary: "storefront.fill",
+            title: "Find Stores\nNear You",
+            subtitle: "Allow location access so GroCart can show you the nearest stores and deliver fresh groceries right to your door.",
+            highlight: "Stores available in your area",
             features: [
-                OnboardingFeature(icon: "lock.open.fill", text: "Members-only weekly specials"),
-                OnboardingFeature(icon: "bag.fill", text: "Free delivery on first 3 orders"),
-                OnboardingFeature(icon: "crown.fill", text: "Early access to seasonal sales")
+                OnboardingFeature(icon: "mappin.circle.fill", text: "See stores closest to your location"),
+                OnboardingFeature(icon: "clock.fill", text: "Accurate delivery time estimates"),
+                OnboardingFeature(icon: "location.circle.fill", text: "Your location is never stored or shared")
             ],
             gradientColors: [Color(red: 0.2, green: 0.6, blue: 0.9), Color(red: 0.1, green: 0.4, blue: 0.8)]
         ),
@@ -118,6 +119,9 @@ struct OnboardingView: View {
                     // Action Button
                     Button(action: {
                         if currentPage < pages.count - 1 {
+                            if currentPage == 1 {
+                                LocationManager.shared.requestLocationIfNeeded()
+                            }
                             withAnimation {
                                 currentPage += 1
                             }
