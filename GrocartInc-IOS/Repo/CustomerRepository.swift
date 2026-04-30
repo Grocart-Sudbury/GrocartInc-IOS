@@ -80,6 +80,20 @@ final class CustomerRepository: @unchecked Sendable {
 
     // MARK: - Orders
 
+    func deleteAccount() async throws {
+        logger.info("DELETE /customer/account")
+        let task = Session.authenticated
+            .request(APIConfig.Customer.account, method: .delete)
+            .validate(statusCode: 200..<300)
+            .serializingData()
+
+        let response = await task.response
+        switch response.result {
+        case .success: return
+        case .failure: try handleFailure(response)
+        }
+    }
+
     func getOrders() async throws -> [CustomerOrderSummary] {
         logger.info("GET /customer/profile (orders)")
         let profile = try await getProfile()

@@ -49,15 +49,7 @@ enum NotificationType {
 // MARK: - Notifications View
 struct NotificationsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var notifications: [AppNotification] = [
-        AppNotification(type: .delivery, title: "Order Out for Delivery", message: "Your order GC-2026-0847 is on its way. Estimated arrival: 2:00 - 3:00 PM", time: "10 min ago", isRead: false),
-        AppNotification(type: .promo, title: "Weekend Flash Sale! ⚡", message: "Get 30% off on all frozen foods this weekend. Use code FROZEN30", time: "1 hour ago", isRead: false),
-        AppNotification(type: .order, title: "Order Confirmed", message: "Your order GC-2026-0847 has been confirmed and is being prepared", time: "2 hours ago", isRead: true),
-        AppNotification(type: .system, title: "New Feature: Scheduled Delivery", message: "You can now schedule your deliveries up to 7 days in advance!", time: "Yesterday", isRead: true),
-        AppNotification(type: .promo, title: "Your Coupon is Expiring Soon", message: "DAIRY10 coupon expires in 3 days. Use it before it's gone!", time: "Yesterday", isRead: true),
-        AppNotification(type: .delivery, title: "Order Delivered ✓", message: "Your order GC-2026-0832 was delivered successfully. Rate your experience!", time: "Feb 5", isRead: true),
-        AppNotification(type: .order, title: "Price Drop Alert", message: "Organic Bananas are now $1.49/lb — 25% less than your last purchase", time: "Feb 4", isRead: true)
-    ]
+    @State private var notifications: [AppNotification] = []
     
     private var unreadCount: Int {
         notifications.filter { !$0.isRead }.count

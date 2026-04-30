@@ -11,6 +11,7 @@ struct HomeTabView: View {
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject private var locationState = LocationState.shared
     @State private var showCityPicker = false
+    @State private var showNotifications = false
     
     private let bannerDeals = [
         ("Fresh Produce Sale", "Up to 30% off fruits & vegetables", "leaf.fill", Color.grocartGreen),
@@ -140,20 +141,18 @@ struct HomeTabView: View {
                 
                 Spacer()
                 
-                Button(action: {}) {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "bell")
-                            .font(.system(size: 20))
-                            .foregroundColor(.grocartPrimary)
-                            .frame(width: 42, height: 42)
-                            .background(Color.grocartSecondaryBackground)
-                            .clipShape(Circle())
-                        
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 8, height: 8)
-                            .offset(x: -2, y: 2)
-                    }
+                NavigationLink(destination: NotificationsView(), isActive: $showNotifications) {
+                    EmptyView()
+                }
+                .hidden()
+
+                Button(action: { showNotifications = true }) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 20))
+                        .foregroundColor(.grocartPrimary)
+                        .frame(width: 42, height: 42)
+                        .background(Color.grocartSecondaryBackground)
+                        .clipShape(Circle())
                 }
             }
             

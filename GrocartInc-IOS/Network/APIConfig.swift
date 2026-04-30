@@ -17,17 +17,16 @@ import Foundation
 struct APIConfig {
     
     // MARK: - Base URL
-    #if DEBUG
-    static let baseURL = "http://147.93.114.66:9092/api"
-    #else
-    static let baseURL = "https://yourdomain.com/api"
-    #endif
+  
+    //static let baseURL = "http://147.93.114.66:9092/api"
+   
+    static let baseURL = "https://api.grocartinc.ca/api"
+   
     
     // MARK: - Auth Endpoints
     struct Auth {
         static let login = "\(baseURL)/auth/login"
         static let register = "\(baseURL)/auth/register/customer"
-        static let forgotPassword = "\(baseURL)/auth/forgot-password"
     }
     struct OTP {
         static let send = "\(baseURL)/otp/send"
@@ -43,7 +42,8 @@ struct APIConfig {
     }
 
     struct Customer {
-        static let profile = "\(baseURL)/customer/profile"
+        static let profile  = "\(baseURL)/customer/profile"
+        static let account  = "\(baseURL)/customer/account"
     }
 
     struct Orders {

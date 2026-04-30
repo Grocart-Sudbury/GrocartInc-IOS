@@ -111,18 +111,6 @@ struct LoginView: View {
                                 )
                             }
                             
-                            // Forgot Password
-                            HStack {
-                                Spacer()
-                                Button(action: {
-                                    // TODO: Forgot password
-                                }) {
-                                    Text("Forgot Password?")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.grocartGreen)
-                                }
-                            }
-                            
                             // Error Message
                             if let error = viewModel.errorMessage {
                                 HStack {
