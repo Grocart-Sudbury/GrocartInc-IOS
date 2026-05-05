@@ -9,14 +9,12 @@ import SwiftUI
 
 struct RootView: View {
     @StateObject private var sessionManager = SessionManager.shared
-    
+
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    
+
     var body: some View {
         Group {
-            if !sessionManager.isLoggedIn {
-                LoginView()
-            } else if !hasCompletedOnboarding {
+            if !hasCompletedOnboarding {
                 OnboardingView(onComplete: {
                     hasCompletedOnboarding = true
                 })
@@ -24,7 +22,6 @@ struct RootView: View {
                 MainTabView()
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: sessionManager.isLoggedIn)
         .animation(.easeInOut(duration: 0.3), value: hasCompletedOnboarding)
         .alert("Session Expired", isPresented: $sessionManager.sessionExpired) {
             Button("Sign In") {

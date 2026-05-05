@@ -55,31 +55,59 @@ struct MyCouponsView: View {
         ZStack {
             Color.grocartBackground.ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                Spacer()
+            if coupons.isEmpty {
+                VStack(spacing: 16) {
+                    Spacer()
 
-                ZStack {
-                    Circle()
-                        .fill(Color.orange.opacity(0.10))
-                        .frame(width: 80, height: 80)
-                    Image(systemName: "ticket")
-                        .font(.system(size: 34))
-                        .foregroundColor(.orange.opacity(0.6))
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.10))
+                            .frame(width: 80, height: 80)
+                        Image(systemName: "ticket")
+                            .font(.system(size: 34))
+                            .foregroundColor(.orange.opacity(0.6))
+                    }
+
+                    Text("No coupons right now")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(.grocartPrimary)
+
+                    Text("Sorry, there are no coupons available\nat the moment. Check back later!")
+                        .font(.system(size: 14))
+                        .foregroundColor(.grocartSecondary)
+                        .multilineTextAlignment(.center)
+
+                    Spacer()
                 }
-
-                Text("No coupons right now")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.grocartPrimary)
-
-                Text("Sorry, there are no coupons available\nat the moment. Check back later!")
-                    .font(.system(size: 14))
-                    .foregroundColor(.grocartSecondary)
-                    .multilineTextAlignment(.center)
-
-                Spacer()
+                .padding(.horizontal, 40)
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(coupons) { coupon in
+                            CouponCard(coupon: coupon) {
+                                selectedCoupon = coupon
+                                showScratchCard = true
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                }
             }
-            .padding(.horizontal, 40)
+
+            if showScratchCard, let coupon = selectedCoupon {
+                ScratchCardOverlay(coupon: coupon) {
+                    if let index = coupons.firstIndex(where: { $0.id == coupon.id }) {
+                        coupons[index].isScratched = true
+                    }
+                    showScratchCard = false
+                    selectedCoupon = nil
+                }
+                .transition(.opacity)
+                .zIndex(1)
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: showScratchCard)
         .navigationTitle("My Coupons")
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(true)

@@ -42,8 +42,11 @@ final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
             return
         }
 
-        // Token expired — show alert before forcing re-login
-        SessionManager.shared.expireSession()
+        // Only treat 401 as session expiry if the user was actually logged in.
+        // Guest users hitting auth-required endpoints get 401 silently.
+        if SessionManager.shared.isLoggedIn {
+            SessionManager.shared.expireSession()
+        }
 
         completion(.doNotRetry)
     }

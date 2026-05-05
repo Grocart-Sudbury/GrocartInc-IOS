@@ -9,9 +9,11 @@ import SwiftUI
 
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
+    @ObservedObject private var sessionManager = SessionManager.shared
+    @Environment(\.dismiss) private var dismiss
     @State private var showPassword = false
     @State private var navigateToOTP = false
-    
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -210,6 +212,9 @@ struct LoginView: View {
             }
             .navigationBarHidden(true)
             .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
+            .onChange(of: sessionManager.isLoggedIn) { loggedIn in
+                if loggedIn { dismiss() }
+            }
         }
     }
 }

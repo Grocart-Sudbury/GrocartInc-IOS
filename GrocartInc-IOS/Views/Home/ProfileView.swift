@@ -5,14 +5,17 @@ import SwiftUI
 
 struct ProfileView: View {
     @StateObject private var profileVM = ProfileViewModel()
+    @ObservedObject private var sessionManager = SessionManager.shared
     @State private var showSignOutAlert = false
     @State private var showEditProfile = false
     @State private var showDeleteWarning1 = false
     @State private var showDeleteWarning2 = false
     @State private var deleteConfirmText = ""
     @State private var isDeletingAccount = false
+    @State private var showLogin = false
+    @State private var showSignUp = false
 
-    private var user: User? { SessionManager.shared.currentUser }
+    private var user: User? { sessionManager.currentUser }
 
     private let menuItems: [(String, String, Color, AnyView)] = [
         ("bag.fill",         "My Orders",           .grocartGreen,                    AnyView(MyOrdersView())),
@@ -25,6 +28,9 @@ struct ProfileView: View {
             ZStack {
                 Color.grocartBackground.ignoresSafeArea()
 
+                if !sessionManager.isLoggedIn {
+                    guestView
+                } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
                         // Profile Header
@@ -124,6 +130,7 @@ struct ProfileView: View {
                             .padding(.bottom, 20)
                     }
                 }
+                } // end else (logged in)
             }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
@@ -173,6 +180,70 @@ struct ProfileView: View {
                 .presentationDetents([.height(380)])
                 .presentationCornerRadius(24)
             }
+            .sheet(isPresented: $showLogin) {
+                LoginView()
+            }
+            .sheet(isPresented: $showSignUp) {
+                SignUpView()
+            }
+        }
+    }
+
+    // MARK: - Guest View
+    private var guestView: some View {
+        VStack(spacing: 32) {
+            Spacer()
+
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color.grocartGreen.opacity(0.1))
+                        .frame(width: 100, height: 100)
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 42))
+                        .foregroundColor(.grocartGreen)
+                }
+
+                VStack(spacing: 8) {
+                    Text("Welcome to GroCart")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+                    Text("Sign in to view your profile, orders, and saved addresses.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.grocartSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+            }
+
+            VStack(spacing: 14) {
+                Button(action: { showLogin = true }) {
+                    Text("Sign In")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color.grocartGreen)
+                        .cornerRadius(14)
+                }
+
+                Button(action: { showSignUp = true }) {
+                    Text("Create Account")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.grocartGreen)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(Color.grocartGreen.opacity(0.1))
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.grocartGreen.opacity(0.3), lineWidth: 1.5)
+                        )
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
         }
     }
 }

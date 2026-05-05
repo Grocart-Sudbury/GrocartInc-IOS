@@ -12,6 +12,7 @@ struct CartView: View {
     @StateObject private var viewModel = CartViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToCheckout = false
+    @State private var showLoginSheet = false
     // Frozen at tap time — never cleared by cart/pricing resets while navigated
     @State private var checkoutPricing: CartPricingResponse? = nil
 
@@ -91,6 +92,13 @@ struct CartView: View {
 
             // Place order button
             placeOrderButton
+        }
+        .sheet(isPresented: $showLoginSheet, onDismiss: {
+            guard SessionManager.shared.isLoggedIn, let pricing = viewModel.pricing else { return }
+            checkoutPricing = pricing
+            navigateToCheckout = true
+        }) {
+            LoginView()
         }
     }
 
@@ -248,6 +256,10 @@ struct CartView: View {
     private var placeOrderButton: some View {
         VStack(spacing: 0) {
             Button(action: {
+                guard SessionManager.shared.isLoggedIn else {
+                    showLoginSheet = true
+                    return
+                }
                 guard let pricing = viewModel.pricing else { return }
                 checkoutPricing = pricing   // freeze before cart is cleared
                 navigateToCheckout = true

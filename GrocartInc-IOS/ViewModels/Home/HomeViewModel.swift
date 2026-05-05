@@ -91,13 +91,14 @@ final class HomeViewModel: ObservableObject {
                 self.categories = fresh
                 
             } catch let error as NetworkError {
-                // If we have cached data, keep showing it despite error
-                if categories.isEmpty {
+                // If we have cached data, keep showing it despite error.
+                // For guests, a 401 on a protected endpoint is expected — show no error.
+                if categories.isEmpty && SessionManager.shared.isLoggedIn {
                     self.errorMessage = error.errorDescription
                 }
                 self.isLoading = false
             } catch {
-                if categories.isEmpty {
+                if categories.isEmpty && SessionManager.shared.isLoggedIn {
                     self.errorMessage = "Something went wrong. Please try again."
                 }
                 self.isLoading = false
