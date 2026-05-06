@@ -18,9 +18,9 @@ struct APIConfig {
     
     // MARK: - Base URL
   
-    static let baseURL = "http://147.93.114.66:9092/api"
+    //static let baseURL = "http://147.93.114.66:9092/api"
    
-   // static let baseURL = "https://api.grocartinc.ca/api"
+   static let baseURL = "https://api.grocartinc.ca/api"
    
     
     // MARK: - Auth Endpoints
@@ -76,7 +76,7 @@ struct APIConfig {
 
     // MARK: - Stripe
     // TODO: Replace with your actual Stripe publishable key from the Stripe Dashboard
-    static let stripePublishableKey = "pk_test_51SLbM0R9HWZnywuRN3JXvhcuEivraWzl9zESdy8rLObHM4UXdFUgzEK8VI4vnj3OSPt9CFPobeRw7xCJ7S3ThiPp00ZyussQp3"
+    static let stripePublishableKey = "pk_live_51SLbLoBz4P6OLwsVYvrJhUb1KonoFVDivJjyIfLmiw3WgNZGYOqPXH8rFCpseI0hAjCEdEoIlOGC6XWrx0YdI51W00XTseX3jc"
 
     // MARK: - Timeouts
     static let requestTimeout: TimeInterval = 30

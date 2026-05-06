@@ -10,6 +10,6 @@ import Foundation
 enum City: String, CaseIterable {
     case sudbury = "Sudbury"
     case timmins = "Timmins"
-    case winnipeg = "Manitoba"
+   // case winnipeg = "Manitoba"
     var displayName: String { rawValue }
 }

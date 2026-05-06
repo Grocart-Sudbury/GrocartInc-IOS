@@ -22,32 +22,7 @@ struct Coupon: Identifiable {
 // MARK: - My Coupons View
 struct MyCouponsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var coupons: [Coupon] = [
-        Coupon(
-            code: "FRESH25",
-            discount: "25% OFF",
-            description: "On fresh fruits & vegetables",
-            expiryDate: "Mar 15, 2026",
-            minimumOrder: "$30",
-            gradientColors: [Color(red: 0.18, green: 0.72, blue: 0.47), Color(red: 0.10, green: 0.55, blue: 0.35)]
-        ),
-        Coupon(
-            code: "DAIRY10",
-            discount: "$10 OFF",
-            description: "On dairy products",
-            expiryDate: "Feb 28, 2026",
-            minimumOrder: "$25",
-            gradientColors: [Color(red: 0.25, green: 0.55, blue: 0.95), Color(red: 0.15, green: 0.38, blue: 0.82)]
-        ),
-        Coupon(
-            code: "FREEDEL",
-            discount: "FREE DELIVERY",
-            description: "On your next order",
-            expiryDate: "Apr 01, 2026",
-            minimumOrder: "$20",
-            gradientColors: [Color(red: 0.72, green: 0.35, blue: 0.85), Color(red: 0.55, green: 0.22, blue: 0.72)]
-        )
-    ]
+    @State private var coupons: [Coupon] = []
     @State private var selectedCoupon: Coupon?
     @State private var showScratchCard = false
     
