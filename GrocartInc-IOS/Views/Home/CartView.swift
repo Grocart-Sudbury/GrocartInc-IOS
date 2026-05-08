@@ -15,6 +15,7 @@ struct CartView: View {
     @State private var showLoginSheet = false
     // Frozen at tap time — never cleared by cart/pricing resets while navigated
     @State private var checkoutPricing: CartPricingResponse? = nil
+    @State private var minOrderError: String? = nil
 
     var body: some View {
         NavigationView {
@@ -95,6 +96,11 @@ struct CartView: View {
         }
         .sheet(isPresented: $showLoginSheet, onDismiss: {
             guard SessionManager.shared.isLoggedIn, let pricing = viewModel.pricing else { return }
+            guard pricing.subtotal >= 30 else {
+                minOrderError = "Minimum order is $30.00. Add more items to continue."
+                return
+            }
+            minOrderError = nil
             checkoutPricing = pricing
             navigateToCheckout = true
         }) {
@@ -255,12 +261,25 @@ struct CartView: View {
     // MARK: - Place Order Button
     private var placeOrderButton: some View {
         VStack(spacing: 0) {
+            if let msg = minOrderError {
+                Text(msg)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+            }
             Button(action: {
                 guard SessionManager.shared.isLoggedIn else {
                     showLoginSheet = true
                     return
                 }
                 guard let pricing = viewModel.pricing else { return }
+                guard pricing.subtotal >= 30 else {
+                    minOrderError = "Minimum order is $30.00. Add more items to continue."
+                    return
+                }
+                minOrderError = nil
                 checkoutPricing = pricing   // freeze before cart is cleared
                 navigateToCheckout = true
             }) {
@@ -286,6 +305,7 @@ struct CartView: View {
             .disabled(viewModel.pricing == nil)
         }
         .background(Color.grocartBackground)
+        .onChange(of: cartManager.items.count) { _ in minOrderError = nil }
     }
 
     // MARK: - Empty
