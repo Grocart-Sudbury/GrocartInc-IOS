@@ -13,12 +13,6 @@ struct HomeTabView: View {
     @State private var showCityPicker = false
     @State private var showNotifications = false
     
-    private let bannerDeals = [
-        ("Fresh Produce Sale", "Up to 30% off fruits & vegetables", "leaf.fill", Color.grocartGreen),
-        ("Weekend Special", "Free delivery on orders over $50", "shippingbox.fill", Color(red: 0.2, green: 0.6, blue: 0.9)),
-        ("New User Offer", "Get $10 off your first order", "gift.fill", Color(red: 0.95, green: 0.55, blue: 0.2))
-    ]
-    
     private let categoryIcons: [String: String] = [
         "Rice & Grains": "🌾",
         "Snacks & Chips": "🍿",
@@ -163,19 +157,22 @@ struct HomeTabView: View {
     }
     
     // MARK: - Promo Banners
+    @ViewBuilder
     private var promoBannersSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 14) {
-                ForEach(Array(bannerDeals.enumerated()), id: \.offset) { _, deal in
-                    PromoBannerCard(
-                        title: deal.0,
-                        subtitle: deal.1,
-                        icon: deal.2,
-                        color: deal.3
-                    )
+        if !viewModel.banners.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(viewModel.banners) { banner in
+                        PromoBannerCard(
+                            title: banner.title,
+                            subtitle: banner.subtitle,
+                            icon: banner.icon,
+                            color: banner.color
+                        )
+                    }
                 }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
         }
     }
     
@@ -316,10 +313,6 @@ struct PromoBannerCard: View {
                     .foregroundColor(.white.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
                 
-                Text("Shop Now →")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.top, 4)
             }
             
             Spacer()

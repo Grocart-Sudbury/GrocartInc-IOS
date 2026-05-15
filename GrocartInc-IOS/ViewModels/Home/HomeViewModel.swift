@@ -21,6 +21,7 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var categories: [Category] = []
     @Published var stores: [Store] = []
+    @Published var banners: [PromoBanner] = []
     @Published var isLoadingStores: Bool = false
     @Published var isLoading: Bool = false
     @Published var isRefreshing: Bool = false
@@ -45,11 +46,13 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Dependencies
     private let productRepository: ProductRepositoryProtocol
     private let storeRepository: StoreRepository
+    private let homeRepository: HomeRepository
 
     // MARK: - Init
     init(productRepository: ProductRepositoryProtocol? = nil) {
         self.productRepository = productRepository ?? ProductRepository.shared
         self.storeRepository = StoreRepository.shared
+        self.homeRepository = HomeRepository.shared
 
         // Re-fetch stores whenever the city resolves or changes.
         // Use `scan` to track whether we passed through "Locating..." so that
@@ -73,26 +76,25 @@ final class HomeViewModel: ObservableObject {
         errorMessage = nil
         
         Task {
+            // Banners are always live — fetch independently and hide on error
+            self.banners = (try? await homeRepository.fetchBanners()) ?? []
+
             do {
-                // 1. Load from cache first (instant)
+                // 1. Load categories from cache first (instant)
                 let cached = try await productRepository.fetchCategories(forceRefresh: false)
                 self.categories = cached
                 self.isLoading = false
-                
-                // 2. Background refresh if cache was used
+
+                // 2. Background refresh only if cache is expired
                 if CacheManager.shared.isValid(forKey: "categories", ttl: APIConfig.categoryCacheTTL) {
-                    // Cache is still valid, no background refresh needed
                     return
                 }
-                
-                // 3. If we got here, cache was expired but we still showed it
-                // Now fetch fresh data silently
+
+                // 3. Cache expired — silently refresh
                 let fresh = try await productRepository.fetchCategories(forceRefresh: true)
                 self.categories = fresh
-                
+
             } catch let error as NetworkError {
-                // If we have cached data, keep showing it despite error.
-                // For guests, a 401 on a protected endpoint is expected — show no error.
                 if categories.isEmpty && SessionManager.shared.isLoggedIn {
                     self.errorMessage = error.errorDescription
                 }
@@ -110,6 +112,8 @@ final class HomeViewModel: ObservableObject {
     func refresh() async {
         isRefreshing = true
         errorMessage = nil
+
+        self.banners = (try? await homeRepository.fetchBanners()) ?? []
 
         do {
             let fresh = try await productRepository.fetchCategories(forceRefresh: true)

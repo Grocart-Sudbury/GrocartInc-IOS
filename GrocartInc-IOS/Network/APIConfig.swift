@@ -59,6 +59,10 @@ struct APIConfig {
         static let categories = "\(baseURL)/categories"
     }
 
+    struct Home {
+        static let banners = "\(baseURL)/home/banners"
+    }
+
     struct Addresses {
         static let base = "\(baseURL)/customer/addresses"
         static func byId(_ id: Int) -> String { "\(base)/\(id)" }
