@@ -18,9 +18,9 @@ struct APIConfig {
     
     // MARK: - Base URL
   
-    //static let baseURL = "http://147.93.114.66:9092/api"
+    static let baseURL = "http://147.93.114.66:9092/api"
    
-   static let baseURL = "https://api.grocartinc.ca/api"
+   //static let baseURL = "https://api.grocartinc.ca/api"
    
     
     // MARK: - Auth Endpoints
@@ -35,6 +35,9 @@ struct APIConfig {
 
     struct Stores {
         static let active = "\(baseURL)/stores/active"
+        static func scheduleByDay(storeId: Int, dayOfWeek: String) -> String {
+            "\(baseURL)/stores/\(storeId)/schedules/\(dayOfWeek)"
+        }
     }
 
     struct Cart {
@@ -61,6 +64,18 @@ struct APIConfig {
         static func byId(_ id: Int) -> String { "\(base)/\(id)" }
         static let defaultAddress = "\(base)/default"
         static func setDefault(_ id: Int) -> String { "\(base)/\(id)/default" }
+    }
+
+    struct CustomerPromoCodes {
+        static let check = "\(baseURL)/customer/promo-codes/check"
+    }
+
+    struct PromoCodes {
+        static let base = "\(baseURL)/admin/promo-codes"
+        static let global = "\(base)/global"
+        static func byCustomer(_ customerId: Int) -> String { "\(base)/customer/\(customerId)" }
+        static func byId(_ id: Int) -> String { "\(base)/\(id)" }
+        static func toggle(_ id: Int) -> String { "\(base)/\(id)/toggle" }
     }
 
     struct Payment {

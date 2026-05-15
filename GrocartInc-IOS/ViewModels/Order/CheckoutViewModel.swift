@@ -30,6 +30,8 @@ final class CheckoutViewModel: ObservableObject {
     // MARK: - Schedule
     @Published var selectedDate: Date = Date()
     @Published var selectedSlot: DeliveryTimeSlot? = nil
+    @Published var availableSlots: [DeliveryTimeSlot] = []
+    @Published var isLoadingSlots = false
 
     // MARK: - Tip & Payment
     @Published var tipAmount: Double = 0
@@ -41,14 +43,21 @@ final class CheckoutViewModel: ObservableObject {
     @Published var placedOrder: OrderResponse? = nil
     @Published var pendingPaymentOrder: OrderResponse? = nil
 
+    // MARK: - Promo Code
+    @Published var couponCode = ""
+    @Published var isApplyingCoupon = false
+    @Published var couponApplied = false
+    @Published var couponError: String? = nil
+    @Published var validatedDiscount: Double = 0
+
     // MARK: - Dependencies
-    let pricing: CartPricingResponse
+    @Published var pricing: CartPricingResponse
     private let cartManager = CartManager.shared
     private let repository = OrderRepository.shared
     private let addressRepo = AddressRepository.shared
 
     // MARK: - Computed
-    var totalWithTip: Double { pricing.total + tipAmount }
+    var totalWithTip: Double { pricing.total - validatedDiscount + tipAmount }
     var formattedTotal: String { String(format: "$%.2f", totalWithTip) }
 
     var availableDates: [Date] {
@@ -56,7 +65,7 @@ final class CheckoutViewModel: ObservableObject {
     }
 
     var isFormValid: Bool {
-        selectedAddress != nil && selectedSlot != nil
+        selectedAddress != nil && selectedSlot != nil && !availableSlots.isEmpty
     }
 
     // MARK: - Init
@@ -103,6 +112,58 @@ final class CheckoutViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Delivery Slots
+    func fetchSlotsForSelectedDate() async {
+        guard let storeId = cartManager.store?.id else { return }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        let dayOfWeek = formatter.string(from: selectedDate).uppercased()
+
+        isLoadingSlots = true
+        defer { isLoadingSlots = false }
+
+        do {
+            let schedule = try await StoreRepository.shared.fetchSchedule(storeId: storeId, dayOfWeek: dayOfWeek)
+            let slots = schedule.slots.compactMap { DeliveryTimeSlot(rawValue: $0) }
+            availableSlots = slots
+            if let current = selectedSlot, !slots.contains(current) {
+                selectedSlot = nil
+            }
+        } catch {
+            availableSlots = []
+            selectedSlot = nil
+        }
+    }
+
+    // MARK: - Promo Code
+    func applyCoupon() {
+        let code = couponCode.trimmingCharacters(in: .whitespaces)
+        guard !code.isEmpty else { return }
+        couponError = nil
+        couponApplied = false
+        validatedDiscount = 0
+        isApplyingCoupon = true
+        Task {
+            do {
+                guard let storeId = cartManager.store?.id else {
+                    couponError = "Could not apply promo code. Try again."
+                    isApplyingCoupon = false
+                    return
+                }
+                let result = try await PromoCodeRepository.shared.checkCode(code, subtotal: pricing.subtotal, storeId: storeId)
+                if result.valid, let discount = result.discount {
+                    validatedDiscount = discount
+                    couponApplied = true
+                } else {
+                    couponError = result.message ?? "Invalid or expired promo code."
+                }
+            } catch {
+                couponError = "Could not apply promo code. Try again."
+            }
+            isApplyingCoupon = false
+        }
+    }
+
     // MARK: - Place Order
     func placeOrder() {
         guard isFormValid, let slot = selectedSlot else {
@@ -145,10 +206,10 @@ final class CheckoutViewModel: ObservableObject {
             tax: pricing.tax,
             shippingCost: pricing.shippingCost,
             serviceFee: pricing.serviceFee,
-            discount: pricing.discount,
+            discount: validatedDiscount,
             tipAmount: tipAmount,
             total: totalWithTip,
-            couponCode: nil,
+            couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
             paymentMethod: paymentMethod,
             preferredDeliveryDate: deliveryDate,
             preferredDeliveryTimeSlot: slot.rawValue,

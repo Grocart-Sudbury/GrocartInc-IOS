@@ -17,6 +17,7 @@ enum DeliveryTimeSlot: String, CaseIterable, Identifiable {
     case slot14_15  = "SLOT_14_15"
     case slot15_16  = "SLOT_15_16"
     case slot16_17  = "SLOT_16_17"
+    case slot17_20  = "SLOT_17_20"
 
     var id: String { rawValue }
 
@@ -30,8 +31,15 @@ enum DeliveryTimeSlot: String, CaseIterable, Identifiable {
         case .slot14_15: return "2–3 PM"
         case .slot15_16: return "3–4 PM"
         case .slot16_17: return "4–5 PM"
+        case .slot17_20: return "5–8 PM"
         }
     }
+}
+
+// MARK: - Delivery Schedule
+struct DeliverySchedule: Decodable {
+    let dayOfWeek: String
+    let slots: [String]
 }
 
 // MARK: - Order Request

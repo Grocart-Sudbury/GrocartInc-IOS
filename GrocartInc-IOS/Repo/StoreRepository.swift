@@ -83,4 +83,29 @@ final class StoreRepository: @unchecked Sendable {
             throw NetworkError.unknown(afError)
         }
     }
+
+    func fetchSchedule(storeId: Int, dayOfWeek: String) async throws -> DeliverySchedule {
+        let url = APIConfig.Stores.scheduleByDay(storeId: storeId, dayOfWeek: dayOfWeek)
+        logger.info("REQUEST: GET \(url)")
+
+        let task = session.request(url, method: .get)
+            .validate(statusCode: 200..<300)
+            .serializingData()
+
+        let response = await task.response
+        logger.info("STATUS CODE: \(response.response?.statusCode ?? -1)")
+
+        switch response.result {
+        case .success(let data):
+            do {
+                return try JSONDecoder().decode(DeliverySchedule.self, from: data)
+            } catch {
+                logger.error("DECODE ERROR: \(error)")
+                throw NetworkError.unknown(error)
+            }
+        case .failure(let afError):
+            logger.error("SCHEDULE FETCH FAILED: \(afError.localizedDescription)")
+            throw NetworkError.unknown(afError)
+        }
+    }
 }

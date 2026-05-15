@@ -30,6 +30,7 @@ struct CheckoutView: View {
                     deliveryAddressSection
                     scheduleSection
                     tipSection
+                    promoCodeSection
                     paymentSection
                     orderSummarySection
                     Spacer().frame(height: 90)
@@ -76,6 +77,12 @@ struct CheckoutView: View {
         .navigationTitle("Checkout")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) { placeOrderButton }
+        .onAppear {
+            Task { await viewModel.fetchSlotsForSelectedDate() }
+        }
+        .onChange(of: viewModel.selectedDate) { _ in
+            Task { await viewModel.fetchSlotsForSelectedDate() }
+        }
         .onChange(of: viewModel.pendingPaymentOrder?.id) { orderId in
             logger.info("🔄 pendingPaymentOrder changed → \(orderId?.description ?? "nil")")
             if orderId != nil { isPaymentActive = true }
@@ -286,20 +293,32 @@ struct CheckoutView: View {
                 .foregroundColor(.grocartSecondary)
                 .padding(.top, 4)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                      spacing: 10) {
-                ForEach(DeliveryTimeSlot.allCases) { slot in
-                    let isSelected = viewModel.selectedSlot == slot
-                    Button(action: { viewModel.selectedSlot = slot }) {
-                        Text(slot.display)
-                            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(isSelected ? .white : .grocartPrimary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
-                            .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+            if viewModel.isLoadingSlots {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            } else if viewModel.availableSlots.isEmpty {
+                Text("No delivery available on this day")
+                    .font(.system(size: 13))
+                    .foregroundColor(.grocartSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                          spacing: 10) {
+                    ForEach(viewModel.availableSlots) { slot in
+                        let isSelected = viewModel.selectedSlot == slot
+                        Button(action: { viewModel.selectedSlot = slot }) {
+                            Text(slot.display)
+                                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? .white : .grocartPrimary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
+                                .cornerRadius(10)
+                                .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+                        }
                     }
                 }
             }
@@ -334,7 +353,63 @@ struct CheckoutView: View {
         }
     }
 
-    // MARK: - 4. Payment
+    // MARK: - 4. Promo Code
+    private var promoCodeSection: some View {
+        card {
+            sectionHeader("Promo Code", icon: "tag.fill")
+
+            HStack(spacing: 10) {
+                TextField("Enter promo code", text: $viewModel.couponCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .font(.system(size: 15))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(Color.grocartBackground)
+                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1))
+
+                Button(action: { viewModel.applyCoupon() }) {
+                    Group {
+                        if viewModel.isApplyingCoupon {
+                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text("Apply")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .frame(width: 70, height: 42)
+                    .background(Color.grocartGreen)
+                    .cornerRadius(10)
+                }
+                .disabled(viewModel.isApplyingCoupon || viewModel.couponCode.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            if viewModel.couponApplied {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 14))
+                    Text("Promo applied! You save \(String(format: "$%.2f", viewModel.validatedDiscount))")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.green)
+                }
+            } else if let error = viewModel.couponError {
+                HStack(spacing: 6) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 14))
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundColor(.red)
+                }
+            }
+        }
+    }
+
+    // MARK: - 5. Payment
     private var paymentSection: some View {
         card {
             sectionHeader("Payment Method", icon: "creditcard.fill")
@@ -357,7 +432,7 @@ struct CheckoutView: View {
         }
     }
 
-    // MARK: - 5. Order Summary
+    // MARK: - 6. Order Summary
     private var orderSummarySection: some View {
         card {
             sectionHeader("Order Summary", icon: "list.bullet.rectangle")
@@ -387,8 +462,8 @@ struct CheckoutView: View {
             if viewModel.pricing.serviceFee > 0 {
                 pricingRow("Service Fee", viewModel.pricing.formattedServiceFee)
             }
-            if viewModel.pricing.discount > 0 {
-                pricingRow("Discount", viewModel.pricing.formattedDiscount, color: .green)
+            if viewModel.validatedDiscount > 0 {
+                pricingRow("Discount", String(format: "-$%.2f", viewModel.validatedDiscount), color: .green)
             }
             if viewModel.tipAmount > 0 {
                 pricingRow("Tip", String(format: "$%.2f", viewModel.tipAmount), color: .grocartGreen)

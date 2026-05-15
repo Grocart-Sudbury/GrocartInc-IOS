@@ -45,6 +45,9 @@ struct CartPricingResponse: Decodable {
 
 extension CartPricingRequest {
     static func cityCode(for cityName: String) -> Int {
-        cityName.lowercased().contains("timmins") ? 1 : 0
+        let name = cityName.lowercased()
+        if name.contains("timmins") { return 1 }
+        if name.contains("winnipeg") { return 2 }
+        return 0
     }
 }
