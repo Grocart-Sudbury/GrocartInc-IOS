@@ -59,16 +59,12 @@ struct OnboardingView: View {
             gradientColors: [Color(red: 0.2, green: 0.6, blue: 0.9), Color(red: 0.1, green: 0.4, blue: 0.8)]
         ),
         OnboardingPage(
-            icon: "bell.badge.fill",
-            iconSecondary: "tag.fill",
-            title: "Price Drops\n& Coupon Codes",
-            subtitle: "Get instant notifications when prices drop on your favourites. Plus, receive exclusive coupon codes straight to your phone.",
-            highlight: "Never miss a deal again",
-            features: [
-                OnboardingFeature(icon: "arrow.down.circle.fill", text: "Real-time price drop alerts"),
-                OnboardingFeature(icon: "ticket.fill", text: "Exclusive coupon codes every week"),
-                OnboardingFeature(icon: "heart.fill", text: "Track prices on your saved items")
-            ],
+            icon: "hands.clap.fill",
+            iconSecondary: "heart.fill",
+            title: "ഹൃദയം നിറഞ്ഞ\nനന്ദി!",
+            subtitle: "ഈ ആപ്പ് ഡൗൺലോഡ് ചെയ്ത് ഞങ്ങളെ വിശ്വസിച്ചതിന് ആത്മാർത്ഥമായ നന്ദി. നിങ്ങളുടെ പിന്തുണ ഇല്ലാതെ ഇത് സാധ്യമാകുമായിരുന്നില്ല.",
+            highlight: "നിങ്ങൾ ഞങ്ങളുടെ ഏറ്റവും വലിയ ശക്തി",
+            features: [],
             gradientColors: [Color(red: 0.95, green: 0.55, blue: 0.2), Color(red: 0.9, green: 0.35, blue: 0.15)]
         )
     ]
