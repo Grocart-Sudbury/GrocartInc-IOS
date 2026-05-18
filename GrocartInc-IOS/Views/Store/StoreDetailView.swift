@@ -389,15 +389,14 @@ struct StoreProductCard: View {
                     switch phase {
                     case .success(let image):
                         image.resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity)
-                            .aspectRatio(1.1, contentMode: .fit)
+                            .scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                             .clipped()
                             .cornerRadius(10)
                     default:
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color.grocartSecondaryBackground)
-                            .aspectRatio(1.1, contentMode: .fit)
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                             .overlay(
                                 Image(systemName: "basket.fill")
                                     .font(.system(size: 24))
@@ -438,7 +437,7 @@ struct StoreProductCard: View {
                             .padding(.vertical, 3)
                             .background(Color.black.opacity(0.6))
                     }
-                    .aspectRatio(1.1, contentMode: .fit)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                     .cornerRadius(10)
                 }
             }
@@ -449,7 +448,7 @@ struct StoreProductCard: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.grocartPrimary)
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
 
                 Text(product.quantity)
                     .font(.system(size: 10))
@@ -465,12 +464,11 @@ struct StoreProductCard: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.grocartGreen)
 
-                    if product.isOnSale {
-                        Text(product.formattedOriginalPrice)
-                            .font(.system(size: 10))
-                            .foregroundColor(.grocartSecondary)
-                            .strikethrough()
-                    }
+                    Text(product.formattedOriginalPrice)
+                        .font(.system(size: 10))
+                        .foregroundColor(.grocartSecondary)
+                        .strikethrough()
+                        .opacity(product.isOnSale ? 1 : 0)
                 }
 
                 Spacer()

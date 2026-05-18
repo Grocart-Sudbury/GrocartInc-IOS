@@ -450,15 +450,14 @@ struct ProductGridCard: View {
                     case .success(let image):
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity)
-                            .aspectRatio(1.2, contentMode: .fit)
+                            .scaledToFill()
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                             .clipped()
                             .cornerRadius(10)
                     case .failure:
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color.grocartSecondaryBackground)
-                            .aspectRatio(1.2, contentMode: .fit)
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                             .overlay(
                                 Image(systemName: "basket.fill")
                                     .font(.system(size: 26))
@@ -467,7 +466,7 @@ struct ProductGridCard: View {
                     default:
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color.grocartSecondaryBackground)
-                            .aspectRatio(1.2, contentMode: .fit)
+                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
                             .overlay(ProgressView())
                     }
                 }
@@ -502,23 +501,23 @@ struct ProductGridCard: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.grocartPrimary)
                     .lineLimit(2)
-                
+                    .frame(maxWidth: .infinity, minHeight: 36, alignment: .topLeading)
+
                 Text(product.quantity)
                     .font(.system(size: 11))
                     .foregroundColor(.grocartSecondary)
-                
+
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(product.formattedOfferPrice)
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(.grocartGreen)
-                        
-                        if product.isOnSale {
-                            Text(product.formattedOriginalPrice)
-                                .font(.system(size: 11))
-                                .foregroundColor(.grocartSecondary)
-                                .strikethrough()
-                        }
+
+                        Text(product.formattedOriginalPrice)
+                            .font(.system(size: 11))
+                            .foregroundColor(.grocartSecondary)
+                            .strikethrough()
+                            .opacity(product.isOnSale ? 1 : 0)
                     }
                     
                     Spacer()
