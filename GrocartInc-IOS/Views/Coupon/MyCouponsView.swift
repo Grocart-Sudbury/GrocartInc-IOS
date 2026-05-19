@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - Coupon Model
 struct Coupon: Identifiable {
-    let id = UUID()
+    let id: Int
     let code: String
     let discount: String
     let description: String
@@ -19,18 +19,104 @@ struct Coupon: Identifiable {
     var isScratched: Bool = false
 }
 
+private extension PromoCode {
+    func toCoupon() -> Coupon {
+        let discountText: String
+        let descriptionText: String
+        let colors: [Color]
+
+        switch rewardType {
+        case .percentage:
+            discountText = "\(Int(rewardValue))% OFF"
+            descriptionText = "Save \(Int(rewardValue))% on your order"
+            colors = [Color.orange, Color.red]
+        case .flat:
+            discountText = "$\(String(format: "%.0f", rewardValue)) OFF"
+            descriptionText = "Save $\(String(format: "%.0f", rewardValue)) on your order"
+            colors = [Color(red: 0.18, green: 0.8, blue: 0.44), Color(red: 0.09, green: 0.63, blue: 0.52)]
+        case .freeDelivery:
+            discountText = "Free Delivery"
+            descriptionText = "No delivery fee on your order"
+            colors = [Color(red: 0.20, green: 0.60, blue: 0.86), Color(red: 0.56, green: 0.27, blue: 0.68)]
+        case .credits:
+            discountText = "$\(String(format: "%.0f", rewardValue)) Credits"
+            descriptionText = "Credits added to your account"
+            colors = [Color(red: 0.56, green: 0.27, blue: 0.68), Color(red: 0.93, green: 0.33, blue: 0.66)]
+        case .item:
+            discountText = rewardItemName ?? "Free Item"
+            descriptionText = "Free item added to your order"
+            colors = [Color(red: 0.95, green: 0.77, blue: 0.06), Color.orange]
+        }
+
+        let expiryText: String
+        if let raw = expiresAt {
+            let display = DateFormatter()
+            display.dateFormat = "MMM d, yyyy"
+            let iso = ISO8601DateFormatter()
+            let plain = DateFormatter()
+            plain.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            plain.locale = Locale(identifier: "en_US_POSIX")
+            if let date = iso.date(from: raw) ?? plain.date(from: raw) {
+                expiryText = display.string(from: date)
+            } else {
+                expiryText = "No expiry"
+            }
+        } else {
+            expiryText = "No expiry"
+        }
+
+        let minOrder: String
+        if let min = minOrderValue, min > 0 {
+            minOrder = "$\(String(format: "%.0f", min))"
+        } else {
+            minOrder = "None"
+        }
+
+        return Coupon(
+            id: id,
+            code: code,
+            discount: discountText,
+            description: descriptionText,
+            expiryDate: expiryText,
+            minimumOrder: minOrder,
+            gradientColors: colors
+        )
+    }
+}
+
 // MARK: - My Coupons View
 struct MyCouponsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var coupons: [Coupon] = []
     @State private var selectedCoupon: Coupon?
     @State private var showScratchCard = false
-    
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
     var body: some View {
         ZStack {
             Color.grocartBackground.ignoresSafeArea()
 
-            if coupons.isEmpty {
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(1.3)
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 34))
+                        .foregroundColor(.orange.opacity(0.6))
+                    Text(error)
+                        .font(.system(size: 14))
+                        .foregroundColor(.grocartSecondary)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") { Task { await loadCoupons() } }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.orange)
+                    Spacer()
+                }
+                .padding(.horizontal, 40)
+            } else if coupons.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()
 
@@ -95,6 +181,19 @@ struct MyCouponsView: View {
                 }
             }
         }
+        .task { await loadCoupons() }
+    }
+
+    private func loadCoupons() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let promoCodes = try await PromoCodeRepository.shared.fetchCustomerCodes()
+            coupons = promoCodes.map { $0.toCoupon() }
+        } catch {
+            errorMessage = "Could not load coupons. Please try again."
+        }
+        isLoading = false
     }
 }
 

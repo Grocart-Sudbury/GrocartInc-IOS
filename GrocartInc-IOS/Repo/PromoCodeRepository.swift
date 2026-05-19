@@ -54,7 +54,21 @@ final class PromoCodeRepository: @unchecked Sendable {
         return req
     }
 
-    // MARK: - GET /api/admin/promo-codes
+    // MARK: - GET /api/customer/promo-codes
+
+    nonisolated func fetchCustomerCodes() async throws -> [PromoCode] {
+        logger.info("GET /customer/promo-codes")
+        let task = Session.authenticated
+            .request(APIConfig.CustomerPromoCodes.base, method: .get)
+            .validate(statusCode: 200..<300)
+            .serializingData()
+
+        let response = await task.response
+        switch response.result {
+        case .success(let data): return try decode([PromoCode].self, from: data)
+        case .failure: try handleFailure(response)
+        }
+    }
 
     // MARK: - POST /api/customer/promo-codes/check
 

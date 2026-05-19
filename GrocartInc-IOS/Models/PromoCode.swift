@@ -27,6 +27,7 @@ struct PromoCode: Codable, Identifiable {
     let expiresAt: String?
     let createdAt: String?
     let customer: PromoCodeCustomer?
+    let store: PromoCodeStore?
     let thirdPartyPartner: String?
     let rewardItemName: String?
     let usesPerCustomer: Int?
@@ -34,7 +35,12 @@ struct PromoCode: Codable, Identifiable {
 
 struct PromoCodeCustomer: Codable {
     let id: Int
-    let email: String?
+    let name: String?
+}
+
+struct PromoCodeStore: Codable {
+    let id: Int
+    let name: String?
 }
 
 struct PromoCodeRequest: Encodable {
