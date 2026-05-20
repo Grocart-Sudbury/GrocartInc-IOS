@@ -17,6 +17,8 @@ struct Coupon: Identifiable {
     let minimumOrder: String
     let gradientColors: [Color]
     var isScratched: Bool = false
+    var isLocked: Bool = false
+    var availableFrom: String? = nil
 }
 
 private extension PromoCode {
@@ -31,15 +33,21 @@ private extension PromoCode {
             descriptionText = "Save \(Int(rewardValue))% on your order"
             colors = [Color.orange, Color.red]
         case .flat:
-            discountText = "$\(String(format: "%.0f", rewardValue)) OFF"
-            descriptionText = "Save $\(String(format: "%.0f", rewardValue)) on your order"
+            let flatStr = rewardValue.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", rewardValue)
+                : String(format: "%.2f", rewardValue)
+            discountText = "$\(flatStr) OFF"
+            descriptionText = "Save $\(flatStr) on your order"
             colors = [Color(red: 0.18, green: 0.8, blue: 0.44), Color(red: 0.09, green: 0.63, blue: 0.52)]
         case .freeDelivery:
             discountText = "Free Delivery"
             descriptionText = "No delivery fee on your order"
             colors = [Color(red: 0.20, green: 0.60, blue: 0.86), Color(red: 0.56, green: 0.27, blue: 0.68)]
         case .credits:
-            discountText = "$\(String(format: "%.0f", rewardValue)) Credits"
+            let creditsStr = rewardValue.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", rewardValue)
+                : String(format: "%.2f", rewardValue)
+            discountText = "$\(creditsStr) Credits"
             descriptionText = "Credits added to your account"
             colors = [Color(red: 0.56, green: 0.27, blue: 0.68), Color(red: 0.93, green: 0.33, blue: 0.66)]
         case .item:
@@ -67,9 +75,30 @@ private extension PromoCode {
 
         let minOrder: String
         if let min = minOrderValue, min > 0 {
-            minOrder = "$\(String(format: "%.0f", min))"
+            let minStr = min.truncatingRemainder(dividingBy: 1) == 0
+                ? String(format: "%.0f", min)
+                : String(format: "%.2f", min)
+            minOrder = "$\(minStr)"
         } else {
             minOrder = "None"
+        }
+
+        // Determine lock state from activeFrom
+        var isLocked = false
+        var availableFromDisplay: String? = nil
+        if let raw = activeFrom {
+            let iso = ISO8601DateFormatter()
+            let plain = DateFormatter()
+            plain.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            plain.locale = Locale(identifier: "en_US_POSIX")
+            if let unlockDate = iso.date(from: raw) ?? plain.date(from: raw) {
+                if unlockDate > Date() {
+                    isLocked = true
+                    let display = DateFormatter()
+                    display.dateFormat = "MMM d, yyyy"
+                    availableFromDisplay = display.string(from: unlockDate)
+                }
+            }
         }
 
         return Coupon(
@@ -79,7 +108,9 @@ private extension PromoCode {
             description: descriptionText,
             expiryDate: expiryText,
             minimumOrder: minOrder,
-            gradientColors: colors
+            gradientColors: colors,
+            isLocked: isLocked,
+            availableFrom: availableFromDisplay
         )
     }
 }
@@ -146,6 +177,7 @@ struct MyCouponsView: View {
                     VStack(spacing: 12) {
                         ForEach(coupons) { coupon in
                             CouponCard(coupon: coupon) {
+                                guard !coupon.isLocked else { return }
                                 selectedCoupon = coupon
                                 showScratchCard = true
                             }
@@ -190,6 +222,10 @@ struct MyCouponsView: View {
         do {
             let promoCodes = try await PromoCodeRepository.shared.fetchCustomerCodes()
             coupons = promoCodes.map { $0.toCoupon() }
+            // Schedule unlock notifications for locked coupons and cancel any
+            // that have already unlocked since the last visit.
+            await CouponNotificationScheduler.scheduleUnlockNotifications(for: promoCodes)
+            CouponNotificationScheduler.cancelUnlockNotifications(for: promoCodes)
         } catch {
             errorMessage = "Could not load coupons. Please try again."
         }
@@ -218,8 +254,12 @@ struct CouponCard: View {
                                 )
                             )
                             .frame(width: 48, height: 48)
-                        
-                        if coupon.isScratched {
+
+                        if coupon.isLocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white.opacity(0.9))
+                        } else if coupon.isScratched {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(.white)
@@ -229,13 +269,21 @@ struct CouponCard: View {
                                 .foregroundColor(.white)
                         }
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 4) {
-                        if coupon.isScratched {
+                        if coupon.isLocked {
+                            Text("Mystery Reward")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.grocartPrimary)
+                            if let from = coupon.availableFrom {
+                                Text("Unlocks \(from)")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.grocartSecondary)
+                            }
+                        } else if coupon.isScratched {
                             Text(coupon.discount)
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.grocartPrimary)
-                            
                             Text(coupon.description)
                                 .font(.system(size: 12))
                                 .foregroundColor(.grocartSecondary)
@@ -243,19 +291,25 @@ struct CouponCard: View {
                             Text("Mystery Reward")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.grocartPrimary)
-                            
                             Text("Tap to scratch & reveal")
                                 .font(.system(size: 12))
                                 .foregroundColor(.grocartSecondary)
                         }
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Right: Action Indicator
                 VStack(spacing: 4) {
-                    if coupon.isScratched {
+                    if coupon.isLocked {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(coupon.gradientColors.first ?? .grocartGreen)
+                        Text("Locked")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(coupon.gradientColors.first ?? .grocartGreen)
+                    } else if coupon.isScratched {
                         Text(coupon.code)
                             .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundColor(coupon.gradientColors.first ?? .grocartGreen)
@@ -265,7 +319,7 @@ struct CouponCard: View {
                                 (coupon.gradientColors.first ?? .grocartGreen).opacity(0.1)
                             )
                             .cornerRadius(6)
-                        
+
                         Text("Exp: \(coupon.expiryDate)")
                             .font(.system(size: 10))
                             .foregroundColor(.grocartSecondary)
@@ -273,7 +327,7 @@ struct CouponCard: View {
                         Image(systemName: "hand.draw.fill")
                             .font(.system(size: 18))
                             .foregroundColor(.orange)
-                        
+
                         Text("Scratch")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.orange)
@@ -286,10 +340,13 @@ struct CouponCard: View {
             .scaleEffect(isPressed ? 0.97 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(coupon.isLocked)
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { _ in
-                    withAnimation(.easeInOut(duration: 0.15)) { isPressed = true }
+                    if !coupon.isLocked {
+                        withAnimation(.easeInOut(duration: 0.15)) { isPressed = true }
+                    }
                 }
                 .onEnded { _ in
                     withAnimation(.easeInOut(duration: 0.15)) { isPressed = false }

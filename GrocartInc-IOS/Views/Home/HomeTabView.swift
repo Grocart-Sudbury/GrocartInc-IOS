@@ -70,6 +70,9 @@ struct HomeTabView: View {
                             // Stores
                             storesSection
 
+                            // Active Orders (shown when logged in and orders exist)
+                            ActiveOrdersSection()
+
                             // Today's Deals (on-sale products)
                             if !viewModel.featuredProducts.isEmpty {
                                 dealsSection

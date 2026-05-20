@@ -24,6 +24,7 @@ struct PromoCode: Codable, Identifiable {
     let maxUses: Int?
     let usedCount: Int
     let active: Bool
+    let activeFrom: String?
     let expiresAt: String?
     let createdAt: String?
     let customer: PromoCodeCustomer?

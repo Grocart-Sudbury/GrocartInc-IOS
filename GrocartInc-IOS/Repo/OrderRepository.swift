@@ -16,6 +16,39 @@ final class OrderRepository: @unchecked Sendable {
     static let shared = OrderRepository()
     private init() {}
 
+    func fetchActiveOrders() async throws -> [ActiveOrder] {
+        logger.info("GET /customer/orders/active")
+
+        let task = Session.authenticated.request(
+            APIConfig.CustomerOrders.active,
+            method: .get
+        )
+        .validate(statusCode: 200..<300)
+        .serializingData()
+
+        let response = await task.response
+        logger.info("ACTIVE ORDERS STATUS: \(response.response?.statusCode ?? -1)")
+
+        switch response.result {
+        case .success(let data):
+            let raw = String(data: data, encoding: .utf8) ?? "nil"
+            logger.debug("ACTIVE ORDERS RAW: \(raw.prefix(500))")
+            do {
+                let orders = try JSONDecoder().decode([ActiveOrder].self, from: data)
+                logger.info("ACTIVE ORDERS SUCCESS: \(orders.count) order(s) returned")
+                return orders
+            } catch {
+                logger.error("ACTIVE ORDERS DECODE ERROR: \(error)")
+                throw NetworkError.unknown(error)
+            }
+        case .failure(let afError):
+            let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
+            logger.error("ACTIVE ORDERS FAILED: \(body)")
+            if response.response?.statusCode == 401 { throw NetworkError.unauthorized }
+            throw NetworkError.unknown(afError)
+        }
+    }
+
     func placeOrder(_ request: OrderRequest) async throws -> OrderResponse {
         logger.info("POST /orders — store:\(request.storeId) items:\(request.items.count)")
 

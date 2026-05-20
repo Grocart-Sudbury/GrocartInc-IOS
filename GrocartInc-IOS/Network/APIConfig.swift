@@ -55,6 +55,10 @@ struct APIConfig {
         static func track(_ trackingId: String) -> String { "\(baseURL)/orders/track/\(trackingId)" }
     }
 
+    struct CustomerOrders {
+        static let active = "\(baseURL)/customer/orders/active"
+    }
+
     struct Products {
         static let categories = "\(baseURL)/categories"
     }
