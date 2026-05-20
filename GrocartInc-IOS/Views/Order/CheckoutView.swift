@@ -27,9 +27,15 @@ struct CheckoutView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    deliveryAddressSection
-                    scheduleSection
-                    tipSection
+                    orderTypeSection
+                    if viewModel.orderType == .delivery {
+                        deliveryAddressSection
+                        scheduleSection
+                        tipSection
+                    } else {
+                        pickupInfoSection
+                        pickupScheduleSection
+                    }
                     promoCodeSection
                     paymentSection
                     orderSummarySection
@@ -78,10 +84,19 @@ struct CheckoutView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) { placeOrderButton }
         .onAppear {
-            Task { await viewModel.fetchSlotsForSelectedDate() }
+            if viewModel.orderType == .delivery {
+                Task { await viewModel.fetchSlotsForSelectedDate() }
+            }
         }
         .onChange(of: viewModel.selectedDate) { _ in
-            Task { await viewModel.fetchSlotsForSelectedDate() }
+            if viewModel.orderType == .delivery {
+                Task { await viewModel.fetchSlotsForSelectedDate() }
+            }
+        }
+        .onChange(of: viewModel.orderType) { type in
+            if type == .delivery {
+                Task { await viewModel.fetchSlotsForSelectedDate() }
+            }
         }
         .onChange(of: viewModel.pendingPaymentOrder?.id) { orderId in
             logger.info("🔄 pendingPaymentOrder changed → \(orderId?.description ?? "nil")")
@@ -119,6 +134,139 @@ struct CheckoutView: View {
         .background(Color.grocartSecondaryBackground.opacity(0.6))
         .cornerRadius(16)
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - 0. Order Type Picker
+    private var orderTypeSection: some View {
+        card {
+            sectionHeader("Order Type", icon: "shippingbox.fill")
+
+            HStack(spacing: 0) {
+                ForEach(OrderType.allCases, id: \.rawValue) { type in
+                    let isSelected = viewModel.orderType == type
+                    Button(action: { viewModel.orderType = type }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: type == .delivery ? "bicycle" : "storefront.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text(type.display)
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(isSelected ? .white : .grocartPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(isSelected ? Color.grocartGreen : Color.clear)
+                        .cornerRadius(10)
+                    }
+                }
+            }
+            .padding(4)
+            .background(Color.grocartBackground)
+            .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+
+            if viewModel.orderType == .pickup {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(.grocartGreen)
+                    Text("Pick up your order at the store. No delivery fee or tip.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary)
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    // MARK: - Pickup Contact Info
+    private var pickupInfoSection: some View {
+        card {
+            sectionHeader("Your Details", icon: "person.fill")
+
+            VStack(spacing: 10) {
+                HStack(spacing: 10) {
+                    checkoutField("First Name", text: $viewModel.firstName)
+                    checkoutField("Last Name", text: $viewModel.lastName)
+                }
+                checkoutField("Email", text: $viewModel.email)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                checkoutField("Phone", text: $viewModel.phone)
+                    .keyboardType(.phonePad)
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "storefront.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(.grocartGreen)
+                Text("You'll receive a notification when your order is ready.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.grocartSecondary)
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private func checkoutField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text)
+            .font(.system(size: 15))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(Color.grocartBackground)
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+    }
+
+    // MARK: - Pickup Schedule
+    private var pickupScheduleSection: some View {
+        card {
+            sectionHeader("Pickup Schedule", icon: "clock.fill")
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(viewModel.availableDates, id: \.self) { date in
+                        let isSelected = Calendar.current.isDate(date, inSameDayAs: viewModel.selectedPickupDate)
+                        Button(action: { viewModel.selectedPickupDate = date }) {
+                            VStack(spacing: 4) {
+                                Text(dayAbbrev(date))
+                                    .font(.system(size: 11, weight: .medium))
+                                Text(dayNumber(date))
+                                    .font(.system(size: 18, weight: .bold))
+                            }
+                            .frame(width: 52, height: 62)
+                            .foregroundColor(isSelected ? .white : .grocartPrimary)
+                            .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+                        }
+                    }
+                }
+            }
+
+            Text("Select a pickup time")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.grocartSecondary)
+                .padding(.top, 4)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(PickupTimeSlot.allCases) { slot in
+                    let isSelected = viewModel.selectedPickupSlot == slot
+                    Button(action: { viewModel.selectedPickupSlot = slot }) {
+                        Text(slot.display)
+                            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                            .foregroundColor(isSelected ? .white : .grocartPrimary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
+                            .cornerRadius(10)
+                            .overlay(RoundedRectangle(cornerRadius: 10)
+                                .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - 1. Delivery Address
@@ -458,14 +606,16 @@ struct CheckoutView: View {
 
             pricingRow("Subtotal", viewModel.pricing.formattedSubtotal)
             pricingRow("Tax (HST 13%)", viewModel.pricing.formattedTax)
-            pricingRow("Shipping", viewModel.pricing.formattedShipping)
-            if viewModel.pricing.serviceFee > 0 {
-                pricingRow("Service Fee", viewModel.pricing.formattedServiceFee)
+            if viewModel.orderType == .delivery {
+                pricingRow("Shipping", viewModel.pricing.formattedShipping)
+                if viewModel.pricing.serviceFee > 0 {
+                    pricingRow("Service Fee", viewModel.pricing.formattedServiceFee)
+                }
             }
             if viewModel.validatedDiscount > 0 {
                 pricingRow("Discount", String(format: "-$%.2f", viewModel.validatedDiscount), color: .green)
             }
-            if viewModel.tipAmount > 0 {
+            if viewModel.orderType == .delivery && viewModel.tipAmount > 0 {
                 pricingRow("Tip", String(format: "$%.2f", viewModel.tipAmount), color: .grocartGreen)
             }
 

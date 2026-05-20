@@ -7,6 +7,19 @@
 
 import Foundation
 
+// MARK: - Order Type
+enum OrderType: String, CaseIterable {
+    case delivery = "DELIVERY"
+    case pickup   = "PICKUP"
+
+    var display: String {
+        switch self {
+        case .delivery: return "Delivery"
+        case .pickup:   return "Pickup"
+        }
+    }
+}
+
 // MARK: - Delivery Time Slots
 enum DeliveryTimeSlot: String, CaseIterable, Identifiable {
     case slot9_10   = "SLOT_9_10"
@@ -36,6 +49,29 @@ enum DeliveryTimeSlot: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Pickup Time Slots
+enum PickupTimeSlot: String, CaseIterable, Identifiable {
+    case slot11_12 = "SLOT_11_12"
+    case slot12_13 = "SLOT_12_13"
+    case slot13_14 = "SLOT_13_14"
+    case slot14_15 = "SLOT_14_15"
+    case slot15_16 = "SLOT_15_16"
+    case slot16_17 = "SLOT_16_17"
+
+    var id: String { rawValue }
+
+    var display: String {
+        switch self {
+        case .slot11_12: return "11:00 AM – 12:00 PM"
+        case .slot12_13: return "12:00 PM – 1:00 PM"
+        case .slot13_14: return "1:00 PM – 2:00 PM"
+        case .slot14_15: return "2:00 PM – 3:00 PM"
+        case .slot15_16: return "3:00 PM – 4:00 PM"
+        case .slot16_17: return "4:00 PM – 5:00 PM"
+        }
+    }
+}
+
 // MARK: - Delivery Schedule
 struct DeliverySchedule: Decodable {
     let dayOfWeek: String
@@ -44,17 +80,23 @@ struct DeliverySchedule: Decodable {
 
 // MARK: - Order Request
 struct OrderRequest: Encodable {
-    // Delivery info
+    let orderType: String
+    // Customer info
     let storeId: Int
     let firstName: String
     let lastName: String
     let email: String
     let phone: String
-    let address: String
-    let city: String
-    let province: String
-    let postalCode: String
+    // Delivery-only fields (nil for pickup)
+    let address: String?
+    let city: String?
+    let province: String?
+    let postalCode: String?
     let deliveryNotes: String?
+    let preferredDeliveryDate: String?
+    let preferredDeliveryTimeSlot: String?
+    let preferredPickupDate: String?
+    let preferredPickupTimeSlot: String?
     // Pricing
     let subtotal: Double
     let tax: Double
@@ -66,9 +108,6 @@ struct OrderRequest: Encodable {
     let couponCode: String?
     // Payment
     let paymentMethod: String
-    // Schedule
-    let preferredDeliveryDate: String   // "YYYY-MM-DD"
-    let preferredDeliveryTimeSlot: String
     let bundleIds: [Int]
     // Items
     let items: [OrderItemRequest]
@@ -86,22 +125,33 @@ struct OrderRequest: Encodable {
 struct OrderResponse: Decodable {
     let id: Int
     let trackingId: String
+    let orderType: String?
     let firstName: String
     let lastName: String
     let email: String
-    let address: String
-    let city: String
+    let address: String?
+    let city: String?
     let total: Double
     let status: String
     let paymentStatus: String
     let paymentMethod: String
-    let preferredDeliveryDate: String
-    let preferredDeliveryTimeSlot: String
+    let preferredDeliveryDate: String?
+    let preferredDeliveryTimeSlot: String?
+    let preferredPickupDate: String?
+    let preferredPickupTimeSlot: String?
     let createdAt: String
+
+    var isPickup: Bool { orderType == OrderType.pickup.rawValue }
 
     var formattedTotal: String { String(format: "$%.2f", total) }
 
-    var slotDisplay: String {
-        DeliveryTimeSlot(rawValue: preferredDeliveryTimeSlot)?.display ?? preferredDeliveryTimeSlot
+    var deliverySlotDisplay: String {
+        guard let slot = preferredDeliveryTimeSlot else { return "" }
+        return DeliveryTimeSlot(rawValue: slot)?.display ?? slot
+    }
+
+    var pickupSlotDisplay: String {
+        guard let slot = preferredPickupTimeSlot else { return "" }
+        return PickupTimeSlot(rawValue: slot)?.display ?? slot
     }
 }

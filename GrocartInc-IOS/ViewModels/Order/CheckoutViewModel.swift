@@ -11,6 +11,9 @@ import Combine
 @MainActor
 final class CheckoutViewModel: ObservableObject {
 
+    // MARK: - Order Type
+    @Published var orderType: OrderType = .delivery
+
     // MARK: - Selected Address
     @Published var selectedAddress: CustomerAddress? = nil {
         didSet { applyAddress(selectedAddress) }
@@ -27,11 +30,15 @@ final class CheckoutViewModel: ObservableObject {
     @Published var postalCode = ""
     @Published var deliveryNotes = ""
 
-    // MARK: - Schedule
+    // MARK: - Delivery Schedule
     @Published var selectedDate: Date = Date()
     @Published var selectedSlot: DeliveryTimeSlot? = nil
     @Published var availableSlots: [DeliveryTimeSlot] = []
     @Published var isLoadingSlots = false
+
+    // MARK: - Pickup Schedule
+    @Published var selectedPickupDate: Date = Date()
+    @Published var selectedPickupSlot: PickupTimeSlot? = nil
 
     // MARK: - Tip & Payment
     @Published var tipAmount: Double = 0
@@ -57,7 +64,12 @@ final class CheckoutViewModel: ObservableObject {
     private let addressRepo = AddressRepository.shared
 
     // MARK: - Computed
-    var totalWithTip: Double { pricing.total - validatedDiscount + tipAmount }
+    var totalWithTip: Double {
+        if orderType == .pickup {
+            return pricing.subtotal + pricing.tax - validatedDiscount
+        }
+        return pricing.total - validatedDiscount + tipAmount
+    }
     var formattedTotal: String { String(format: "$%.2f", totalWithTip) }
 
     var availableDates: [Date] {
@@ -65,7 +77,13 @@ final class CheckoutViewModel: ObservableObject {
     }
 
     var isFormValid: Bool {
-        selectedAddress != nil && selectedSlot != nil && !availableSlots.isEmpty
+        switch orderType {
+        case .delivery:
+            return selectedAddress != nil && selectedSlot != nil && !availableSlots.isEmpty
+        case .pickup:
+            return !firstName.isEmpty && !lastName.isEmpty && !email.isEmpty && !phone.isEmpty
+                && selectedPickupSlot != nil
+        }
     }
 
     // MARK: - Init
@@ -166,18 +184,16 @@ final class CheckoutViewModel: ObservableObject {
 
     // MARK: - Place Order
     func placeOrder() {
-        guard isFormValid, let slot = selectedSlot else {
-            errorMessage = "Please select a delivery address and time slot."
+        guard isFormValid else {
+            errorMessage = orderType == .delivery
+                ? "Please select a delivery address and time slot."
+                : "Please fill in your details and select a pickup time slot."
             return
         }
         guard let store = cartManager.store else { return }
 
         errorMessage = nil
         isPlacingOrder = true
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        let deliveryDate = dateFormatter.string(from: selectedDate)
 
         let orderItems = cartManager.items.map { item in
             OrderRequest.OrderItemRequest(
@@ -189,33 +205,81 @@ final class CheckoutViewModel: ObservableObject {
             )
         }
 
-        let cityDisplay = city.isEmpty ? LocationState.shared.cityName : city
+        let request: OrderRequest
 
-        let request = OrderRequest(
-            storeId: store.id,
-            firstName: firstName.trimmingCharacters(in: .whitespaces),
-            lastName: lastName.trimmingCharacters(in: .whitespaces),
-            email: email.trimmingCharacters(in: .whitespaces).lowercased(),
-            phone: phone.trimmingCharacters(in: .whitespaces),
-            address: address.trimmingCharacters(in: .whitespaces),
-            city: cityDisplay,
-            province: province,
-            postalCode: postalCode.trimmingCharacters(in: .whitespaces).uppercased(),
-            deliveryNotes: deliveryNotes.isEmpty ? nil : deliveryNotes,
-            subtotal: pricing.subtotal,
-            tax: pricing.tax,
-            shippingCost: pricing.shippingCost,
-            serviceFee: pricing.serviceFee,
-            discount: validatedDiscount,
-            tipAmount: tipAmount,
-            total: totalWithTip,
-            couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
-            paymentMethod: paymentMethod,
-            preferredDeliveryDate: deliveryDate,
-            preferredDeliveryTimeSlot: slot.rawValue,
-            bundleIds: [],
-            items: orderItems
-        )
+        if orderType == .delivery {
+            guard let slot = selectedSlot else {
+                errorMessage = "Please select a delivery time slot."
+                isPlacingOrder = false
+                return
+            }
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let deliveryDate = dateFormatter.string(from: selectedDate)
+            let cityDisplay = city.isEmpty ? LocationState.shared.cityName : city
+
+            request = OrderRequest(
+                orderType: OrderType.delivery.rawValue,
+                storeId: store.id,
+                firstName: firstName.trimmingCharacters(in: .whitespaces),
+                lastName: lastName.trimmingCharacters(in: .whitespaces),
+                email: email.trimmingCharacters(in: .whitespaces).lowercased(),
+                phone: phone.trimmingCharacters(in: .whitespaces),
+                address: address.trimmingCharacters(in: .whitespaces),
+                city: cityDisplay,
+                province: province,
+                postalCode: postalCode.trimmingCharacters(in: .whitespaces).uppercased(),
+                deliveryNotes: deliveryNotes.isEmpty ? nil : deliveryNotes,
+                preferredDeliveryDate: deliveryDate,
+                preferredDeliveryTimeSlot: slot.rawValue,
+                preferredPickupDate: nil,
+                preferredPickupTimeSlot: nil,
+                subtotal: pricing.subtotal,
+                tax: pricing.tax,
+                shippingCost: pricing.shippingCost,
+                serviceFee: pricing.serviceFee,
+                discount: validatedDiscount,
+                tipAmount: tipAmount,
+                total: totalWithTip,
+                couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
+                paymentMethod: paymentMethod,
+                bundleIds: [],
+                items: orderItems
+            )
+        } else {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let pickupDate = dateFormatter.string(from: selectedPickupDate)
+
+            request = OrderRequest(
+                orderType: OrderType.pickup.rawValue,
+                storeId: store.id,
+                firstName: firstName.trimmingCharacters(in: .whitespaces),
+                lastName: lastName.trimmingCharacters(in: .whitespaces),
+                email: email.trimmingCharacters(in: .whitespaces).lowercased(),
+                phone: phone.trimmingCharacters(in: .whitespaces),
+                address: nil,
+                city: nil,
+                province: nil,
+                postalCode: nil,
+                deliveryNotes: nil,
+                preferredDeliveryDate: nil,
+                preferredDeliveryTimeSlot: nil,
+                preferredPickupDate: pickupDate,
+                preferredPickupTimeSlot: selectedPickupSlot?.rawValue,
+                subtotal: pricing.subtotal,
+                tax: pricing.tax,
+                shippingCost: 0,
+                serviceFee: 0,
+                discount: validatedDiscount,
+                tipAmount: 0,
+                total: pricing.subtotal + pricing.tax - validatedDiscount,
+                couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
+                paymentMethod: paymentMethod,
+                bundleIds: [],
+                items: orderItems
+            )
+        }
 
         Task {
             do {

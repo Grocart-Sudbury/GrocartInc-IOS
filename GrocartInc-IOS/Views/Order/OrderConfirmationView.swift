@@ -37,7 +37,9 @@ struct OrderConfirmationView: View {
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(.grocartPrimary)
 
-                        Text("Your order has been received and is being prepared.")
+                        Text(order.isPickup
+                             ? "Your order is confirmed. We'll notify you when it's ready for pickup."
+                             : "Your order has been received and is being prepared.")
                             .font(.system(size: 15))
                             .foregroundColor(.grocartSecondary)
                             .multilineTextAlignment(.center)
@@ -68,18 +70,42 @@ struct OrderConfirmationView: View {
                                   label: "Customer",
                                   value: "\(order.firstName) \(order.lastName)")
                         Divider().padding(.horizontal, 16)
-                        detailRow(icon: "mappin.circle.fill",
-                                  label: "Delivery to",
-                                  value: "\(order.address), \(order.city)")
-                        Divider().padding(.horizontal, 16)
-                        detailRow(icon: "calendar",
-                                  label: "Delivery date",
-                                  value: formatDate(order.preferredDeliveryDate))
-                        Divider().padding(.horizontal, 16)
-                        detailRow(icon: "clock.fill",
-                                  label: "Time slot",
-                                  value: order.slotDisplay)
-                        Divider().padding(.horizontal, 16)
+                        if order.isPickup {
+                            detailRow(icon: "storefront.fill",
+                                      label: "Order type",
+                                      value: "In-store Pickup")
+                            if let date = order.preferredPickupDate {
+                                Divider().padding(.horizontal, 16)
+                                detailRow(icon: "calendar",
+                                          label: "Pickup date",
+                                          value: formatDate(date))
+                            }
+                            if !order.pickupSlotDisplay.isEmpty {
+                                Divider().padding(.horizontal, 16)
+                                detailRow(icon: "clock.fill",
+                                          label: "Pickup time",
+                                          value: order.pickupSlotDisplay)
+                            }
+                        } else {
+                            if let address = order.address, let city = order.city {
+                                detailRow(icon: "mappin.circle.fill",
+                                          label: "Delivery to",
+                                          value: "\(address), \(city)")
+                                Divider().padding(.horizontal, 16)
+                            }
+                            if let date = order.preferredDeliveryDate {
+                                detailRow(icon: "calendar",
+                                          label: "Delivery date",
+                                          value: formatDate(date))
+                                Divider().padding(.horizontal, 16)
+                            }
+                            if !order.deliverySlotDisplay.isEmpty {
+                                detailRow(icon: "clock.fill",
+                                          label: "Time slot",
+                                          value: order.deliverySlotDisplay)
+                                Divider().padding(.horizontal, 16)
+                            }
+                        }
                         detailRow(icon: "creditcard.fill",
                                   label: "Payment",
                                   value: order.paymentMethod)
