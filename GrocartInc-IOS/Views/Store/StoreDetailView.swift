@@ -24,6 +24,19 @@ struct StoreDetailView: View {
     @State private var activeCategoryId: Int? = nil
     @State private var isCategoryTap = false
     @State private var showCart = false
+    @State private var searchText = ""
+
+    private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    private var searchResults: [(product: Product, category: Category)] {
+        guard isSearching else { return [] }
+        let query = searchText.lowercased()
+        return viewModel.categories.flatMap { cat in
+            cat.products
+                .filter { $0.name.lowercased().contains(query) }
+                .map { (product: $0, category: cat) }
+        }
+    }
 
     private let gridColumns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
 
@@ -68,7 +81,9 @@ struct StoreDetailView: View {
                     storeHeader
 
                     Section {
-                        if viewModel.categories.isEmpty {
+                        if isSearching {
+                            searchResultsSection
+                        } else if viewModel.categories.isEmpty {
                             emptyProductsView
                         } else {
                             ForEach(viewModel.categories) { category in
@@ -78,7 +93,9 @@ struct StoreDetailView: View {
                         // Bottom padding so floating button doesn't cover last items
                         Color.clear.frame(height: 90)
                     } header: {
-                        categoryBar(proxy: productProxy)
+                        if !isSearching {
+                            categoryBar(proxy: productProxy)
+                        }
                     }
                 }
             }
@@ -212,8 +229,30 @@ struct StoreDetailView: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 12)
+            .padding(.top, 8)
             .background(Color.grocartBackground)
+
+            // Search bar
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundColor(.grocartSecondary)
+                TextField("Search products...", text: $searchText)
+                    .font(.system(size: 14))
+                if isSearching {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.grocartSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.grocartSecondaryBackground)
+            .cornerRadius(10)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
     }
 
@@ -263,6 +302,35 @@ struct StoreDetailView: View {
                     chipProxy.scrollTo("chip_\(id)", anchor: .center)
                 }
             }
+        }
+    }
+
+    // MARK: - Search Results
+    @ViewBuilder
+    private var searchResultsSection: some View {
+        if searchResults.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 36))
+                    .foregroundColor(.grocartSecondary)
+                Text("No results for \"\(searchText)\"")
+                    .font(.system(size: 14))
+                    .foregroundColor(.grocartSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 60)
+        } else {
+            LazyVGrid(columns: gridColumns, spacing: 14) {
+                ForEach(searchResults, id: \.product.id) { item in
+                    StoreProductCard(
+                        product: item.product,
+                        categoryName: item.category.name,
+                        store: viewModel.store
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
     }
 

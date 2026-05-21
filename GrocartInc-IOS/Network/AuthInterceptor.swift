@@ -42,6 +42,15 @@ final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
             return
         }
 
+        // If the body contains a business error message (e.g. stock validation),
+        // this is NOT a real auth failure — let the repository handle it.
+        if let data = (request as? DataRequest)?.data,
+           let json = try? JSONDecoder().decode(APIErrorResponse.self, from: data),
+           let message = json.message, !message.isEmpty {
+            completion(.doNotRetry)
+            return
+        }
+
         // Only treat 401 as session expiry if the user was actually logged in.
         // Guest users hitting auth-required endpoints get 401 silently.
         if SessionManager.shared.isLoggedIn {

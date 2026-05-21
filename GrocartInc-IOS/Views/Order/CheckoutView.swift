@@ -566,7 +566,7 @@ struct CheckoutView: View {
                 Image(systemName: "creditcard.fill")
                     .font(.system(size: 15))
                     .foregroundColor(.grocartGreen)
-                Text("Credit Card")
+                Text("Credit / Debit Card")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.grocartPrimary)
             }
