@@ -451,80 +451,86 @@ struct StoreProductCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Image
-            ZStack(alignment: .topLeading) {
-                AsyncImage(url: URL(string: product.imageUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable()
-                            .scaledToFill()
+            // Tappable image + info navigates to detail
+            NavigationLink(destination: ProductDetailView(product: product, categoryName: categoryName, store: store)) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Image
+                    ZStack(alignment: .topLeading) {
+                        AsyncImage(url: URL(string: product.imageUrl)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable()
+                                    .scaledToFill()
+                                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+                                    .clipped()
+                                    .cornerRadius(10)
+                            default:
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.grocartSecondaryBackground)
+                                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
+                                    .overlay(
+                                        Image(systemName: "basket.fill")
+                                            .font(.system(size: 24))
+                                            .foregroundColor(.grocartGreen.opacity(0.3))
+                                    )
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            if product.isOnSale {
+                                Text("-\(product.discountPercentage)%")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.red)
+                                    .cornerRadius(5)
+                            }
+                            if product.isSpecialOrder {
+                                Text("Special Order")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.orange)
+                                    .cornerRadius(5)
+                            }
+                        }
+                        .padding(5)
+
+                        if !product.isInStock {
+                            VStack {
+                                Spacer()
+                                Text("Out of Stock")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(0.6))
+                            }
                             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
-                            .clipped()
                             .cornerRadius(10)
-                    default:
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.grocartSecondaryBackground)
-                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
-                            .overlay(
-                                Image(systemName: "basket.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.grocartGreen.opacity(0.3))
-                            )
+                        }
                     }
-                }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    if product.isOnSale {
-                        Text("-\(product.discountPercentage)%")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.red)
-                            .cornerRadius(5)
-                    }
-                    if product.isSpecialOrder {
-                        Text("Special Order")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.orange)
-                            .cornerRadius(5)
-                    }
-                }
-                .padding(5)
+                    // Name + qty
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(product.name)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.grocartPrimary)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
 
-                if !product.isInStock {
-                    VStack {
-                        Spacer()
-                        Text("Out of Stock")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 3)
-                            .background(Color.black.opacity(0.6))
+                        Text(product.quantity)
+                            .font(.system(size: 10))
+                            .foregroundColor(.grocartSecondary)
                     }
-                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 130, maxHeight: 130)
-                    .cornerRadius(10)
+                    .padding(.horizontal, 2)
                 }
             }
+            .buttonStyle(.plain)
 
-            // Name + qty
-            VStack(alignment: .leading, spacing: 2) {
-                Text(product.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.grocartPrimary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
-
-                Text(product.quantity)
-                    .font(.system(size: 10))
-                    .foregroundColor(.grocartSecondary)
-            }
-            .padding(.horizontal, 2)
-
-            // Price row + Add/Qty button
+            // Price row + Add/Qty button (not part of navigation tap area)
             let qty = cartManager.count(for: product.id)
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 1) {
