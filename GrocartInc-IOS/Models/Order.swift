@@ -34,6 +34,20 @@ enum DeliveryTimeSlot: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var startHour: Int {
+        switch self {
+        case .slot9_10:  return 9
+        case .slot10_11: return 10
+        case .slot11_12: return 11
+        case .slot12_13: return 12
+        case .slot13_14: return 13
+        case .slot14_15: return 14
+        case .slot15_16: return 15
+        case .slot16_17: return 16
+        case .slot17_20: return 17
+        }
+    }
+
     var display: String {
         switch self {
         case .slot9_10:  return "9–10 AM"
@@ -51,23 +65,52 @@ enum DeliveryTimeSlot: String, CaseIterable, Identifiable {
 
 // MARK: - Pickup Time Slots
 enum PickupTimeSlot: String, CaseIterable, Identifiable {
+    case slot10_11 = "SLOT_10_11"
     case slot11_12 = "SLOT_11_12"
     case slot12_13 = "SLOT_12_13"
     case slot13_14 = "SLOT_13_14"
     case slot14_15 = "SLOT_14_15"
     case slot15_16 = "SLOT_15_16"
     case slot16_17 = "SLOT_16_17"
+    case slot17_18 = "SLOT_17_18"
+    case slot18_19 = "SLOT_18_19"
+    case slot19_20 = "SLOT_19_20"
+    case slot20_21 = "SLOT_20_21"
+    case slot21_22 = "SLOT_21_22"
 
     var id: String { rawValue }
 
+    var startHour: Int {
+        switch self {
+        case .slot10_11: return 10
+        case .slot11_12: return 11
+        case .slot12_13: return 12
+        case .slot13_14: return 13
+        case .slot14_15: return 14
+        case .slot15_16: return 15
+        case .slot16_17: return 16
+        case .slot17_18: return 17
+        case .slot18_19: return 18
+        case .slot19_20: return 19
+        case .slot20_21: return 20
+        case .slot21_22: return 21
+        }
+    }
+
     var display: String {
         switch self {
+        case .slot10_11: return "10:00 AM – 11:00 AM"
         case .slot11_12: return "11:00 AM – 12:00 PM"
         case .slot12_13: return "12:00 PM – 1:00 PM"
         case .slot13_14: return "1:00 PM – 2:00 PM"
         case .slot14_15: return "2:00 PM – 3:00 PM"
         case .slot15_16: return "3:00 PM – 4:00 PM"
         case .slot16_17: return "4:00 PM – 5:00 PM"
+        case .slot17_18: return "5:00 PM – 6:00 PM"
+        case .slot18_19: return "6:00 PM – 7:00 PM"
+        case .slot19_20: return "7:00 PM – 8:00 PM"
+        case .slot20_21: return "8:00 PM – 9:00 PM"
+        case .slot21_22: return "9:00 PM – 10:00 PM"
         }
     }
 }

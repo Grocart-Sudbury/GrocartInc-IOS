@@ -249,20 +249,28 @@ struct CheckoutView: View {
                 .foregroundColor(.grocartSecondary)
                 .padding(.top, 4)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(PickupTimeSlot.allCases) { slot in
-                    let isSelected = viewModel.selectedPickupSlot == slot
-                    Button(action: { viewModel.selectedPickupSlot = slot }) {
-                        Text(slot.display)
-                            .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                            .foregroundColor(isSelected ? .white : .grocartPrimary)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
-                            .cornerRadius(10)
-                            .overlay(RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+            if viewModel.availablePickupSlots.isEmpty {
+                Text("No pickup available on this day")
+                    .font(.system(size: 13))
+                    .foregroundColor(.grocartSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 12)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach(viewModel.availablePickupSlots) { slot in
+                        let isSelected = viewModel.selectedPickupSlot == slot
+                        Button(action: { viewModel.selectedPickupSlot = slot }) {
+                            Text(slot.display)
+                                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                                .foregroundColor(isSelected ? .white : .grocartPrimary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(isSelected ? Color.grocartGreen : Color.grocartBackground)
+                                .cornerRadius(10)
+                                .overlay(RoundedRectangle(cornerRadius: 10)
+                                    .stroke(isSelected ? Color.clear : Color.gray.opacity(0.2), lineWidth: 1))
+                        }
                     }
                 }
             }

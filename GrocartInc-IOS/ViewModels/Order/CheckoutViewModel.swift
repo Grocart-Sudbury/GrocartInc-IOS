@@ -37,7 +37,13 @@ final class CheckoutViewModel: ObservableObject {
     @Published var isLoadingSlots = false
 
     // MARK: - Pickup Schedule
-    @Published var selectedPickupDate: Date = Date()
+    @Published var selectedPickupDate: Date = Date() {
+        didSet {
+            if let slot = selectedPickupSlot, !availablePickupSlots.contains(slot) {
+                selectedPickupSlot = nil
+            }
+        }
+    }
     @Published var selectedPickupSlot: PickupTimeSlot? = nil
 
     // MARK: - Tip & Payment
@@ -130,6 +136,21 @@ final class CheckoutViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Pickup Slots (filtered for today)
+    var availablePickupSlots: [PickupTimeSlot] {
+        let calendar = Calendar.current
+        guard calendar.isDateInToday(selectedPickupDate) else { return PickupTimeSlot.allCases }
+        let thirtyMinsFromNow = Date().addingTimeInterval(30 * 60)
+        return PickupTimeSlot.allCases.filter { slot in
+            var comps = calendar.dateComponents([.year, .month, .day], from: Date())
+            comps.hour = slot.startHour
+            comps.minute = 0
+            comps.second = 0
+            guard let slotDate = calendar.date(from: comps) else { return false }
+            return slotDate >= thirtyMinsFromNow
+        }
+    }
+
     // MARK: - Delivery Slots
     func fetchSlotsForSelectedDate() async {
         guard let storeId = cartManager.store?.id else { return }
@@ -142,7 +163,21 @@ final class CheckoutViewModel: ObservableObject {
 
         do {
             let schedule = try await StoreRepository.shared.fetchSchedule(storeId: storeId, dayOfWeek: dayOfWeek)
-            let slots = schedule.slots.compactMap { DeliveryTimeSlot(rawValue: $0) }
+            var slots = schedule.slots.compactMap { DeliveryTimeSlot(rawValue: $0) }
+
+            let calendar = Calendar.current
+            if calendar.isDateInToday(selectedDate) {
+                let threeHoursFromNow = Date().addingTimeInterval(2 * 3600)
+                slots = slots.filter { slot in
+                    var comps = calendar.dateComponents([.year, .month, .day], from: Date())
+                    comps.hour = slot.startHour
+                    comps.minute = 0
+                    comps.second = 0
+                    guard let slotDate = calendar.date(from: comps) else { return false }
+                    return slotDate >= threeHoursFromNow
+                }
+            }
+
             availableSlots = slots
             if let current = selectedSlot, !slots.contains(current) {
                 selectedSlot = nil
