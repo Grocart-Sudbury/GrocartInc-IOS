@@ -51,7 +51,7 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
         // 2. Fetch from API
         logger.info("Fetching categories from API")
         
-        let categories: [Category] = try await performAuthenticatedRequest(
+        let categories: [Category] = try await performPublicRequest(
             url: APIConfig.Products.categories,
             method: .get
         )
@@ -99,6 +99,44 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
         cache.clear(forKey: cacheKey)
     }
     
+    // MARK: - Public Request Helper (no auth token)
+    private func performPublicRequest<T: Decodable>(
+        url: String,
+        method: HTTPMethod,
+        parameters: [String: Any]? = nil
+    ) async throws -> T {
+        logger.info("REQUEST: \(method.rawValue) \(url)")
+
+        let task = publicSession.request(
+            url,
+            method: method,
+            parameters: parameters,
+            encoding: JSONEncoding.default
+        )
+        .validate(statusCode: 200..<300)
+        .serializingData()
+
+        let response = await task.response
+        logger.info("STATUS CODE: \(response.response?.statusCode ?? -1)")
+
+        switch response.result {
+        case .success(let data):
+            let rawJSON = String(data: data, encoding: .utf8) ?? "nil"
+            logger.debug("RAW RESPONSE: \(rawJSON.prefix(500))")
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                logger.error("DECODE ERROR: \(error)")
+                throw NetworkError.unknown(error)
+            }
+        case .failure(let afError):
+            let errorData = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
+            logger.error("REQUEST FAILED: \(afError.localizedDescription)")
+            logger.error("ERROR RESPONSE BODY: \(errorData)")
+            throw mapError(afError, data: response.data, statusCode: response.response?.statusCode)
+        }
+    }
+
     // MARK: - Authenticated Request Helper
     private func performAuthenticatedRequest<T: Decodable>(
         url: String,

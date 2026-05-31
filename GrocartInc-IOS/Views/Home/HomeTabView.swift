@@ -13,82 +13,30 @@ struct HomeTabView: View {
     @State private var showCityPicker = false
     @State private var showNotifications = false
     
-    private let categoryIcons: [String: String] = [
-        "Rice & Grains": "🌾",
-        "Snacks & Chips": "🍿",
-        "Pickles": "🫙",
-        "Masalas & Powders": "🌶️",
-        "Spices & Seeds": "🫘",
-        "Seafood/Frozen": "🐟",
-        "Households": "🏠"
-    ]
-    
     var body: some View {
         NavigationView {
             ZStack {
                 Color.grocartBackground.ignoresSafeArea()
                 
-                if viewModel.isLoading && viewModel.categories.isEmpty {
-                    // First load spinner
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text("Loading groceries...")
-                            .font(.system(size: 14))
-                            .foregroundColor(.grocartSecondary)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 24) {
+                        // Header
+                        headerSection
+
+                        // Promo Banners
+                        promoBannersSection
+
+                        // Stores
+                        storesSection
+
+                        // Active Orders (shown when logged in and orders exist)
+                        ActiveOrdersSection()
+
+                        Spacer().frame(height: 20)
                     }
-                } else if let error = viewModel.errorMessage, viewModel.categories.isEmpty {
-                    // Error state (only if no cached data)
-                    VStack(spacing: 16) {
-                        Image(systemName: "wifi.slash")
-                            .font(.system(size: 40))
-                            .foregroundColor(.grocartSecondary)
-                        Text(error)
-                            .font(.system(size: 14))
-                            .foregroundColor(.grocartSecondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                        Button("Try Again") {
-                            viewModel.loadData()
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 12)
-                        .background(Color.grocartGreen)
-                        .cornerRadius(10)
-                    }
-                } else {
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 24) {
-                            // Header
-                            headerSection
-                            
-                            // Promo Banners
-                            promoBannersSection
-
-                            // Stores
-                            storesSection
-
-                            // Active Orders (shown when logged in and orders exist)
-                            ActiveOrdersSection()
-
-                            // Today's Deals (on-sale products)
-                            if !viewModel.featuredProducts.isEmpty {
-                                dealsSection
-                            }
-
-                            // Browse by Category sections
-                            ForEach(viewModel.categories) { category in
-                                categoryProductsSection(category: category)
-                            }
-
-                            Spacer().frame(height: 20)
-                        }
-                    }
-                    .refreshable {
-                        await viewModel.refresh()
-                    }
+                }
+                .refreshable {
+                    await viewModel.refresh()
                 }
             }
             .navigationBarHidden(true)
@@ -238,63 +186,6 @@ struct HomeTabView: View {
         }
     }
     
-    // MARK: - Today's Deals
-    private var dealsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "flame.fill")
-                        .foregroundColor(.orange)
-                    Text("Today's Deals")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.grocartPrimary)
-                }
-                Spacer()
-                Button("View All") {}
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.grocartGreen)
-            }
-            .padding(.horizontal, 20)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(viewModel.featuredProducts) { product in
-                        ProductDealCard(product: product)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-    
-    // MARK: - Category Products Section
-    private func categoryProductsSection(category: Category) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                HStack(spacing: 6) {
-                    Text(categoryIcons[category.name] ?? "🛒")
-                        .font(.system(size: 16))
-                    Text(category.name)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.grocartPrimary)
-                }
-                Spacer()
-                Button("View All") {}
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.grocartGreen)
-            }
-            .padding(.horizontal, 20)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(category.products.filter { $0.isInStock }.prefix(6)) { product in
-                        ProductDealCard(product: product)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
 }
 
 // MARK: - Promo Banner Card
