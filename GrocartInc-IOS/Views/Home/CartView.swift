@@ -96,8 +96,8 @@ struct CartView: View {
         }
         .sheet(isPresented: $showLoginSheet, onDismiss: {
             guard SessionManager.shared.isLoggedIn, let pricing = viewModel.pricing else { return }
-            guard pricing.subtotal >= 30 else {
-                minOrderError = "Minimum order is $30.00. Add more items to continue."
+            guard pricing.subtotal >= 20 else {
+                minOrderError = "Minimum order is $20.00. Add more items to continue."
                 return
             }
             minOrderError = nil
@@ -165,7 +165,7 @@ struct CartView: View {
                     Image(systemName: "minus")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.grocartGreen)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 20, height: 20)
                 }
                 Text("\(item.count)")
                     .font(.system(size: 14, weight: .bold))
@@ -177,7 +177,7 @@ struct CartView: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 20, height: 20)
                         .background(Color.grocartGreen)
                         .clipShape(Circle())
                 }
@@ -226,7 +226,6 @@ struct CartView: View {
         VStack(spacing: 10) {
             pricingRow(label: "Subtotal", value: pricing.formattedSubtotal)
             pricingRow(label: "Tax (HST 13%)", value: pricing.formattedTax)
-            pricingRow(label: "Shipping", value: pricing.formattedShipping)
             if pricing.serviceFee > 0 {
                 pricingRow(label: "Service Fee", value: pricing.formattedServiceFee)
             }
@@ -275,8 +274,8 @@ struct CartView: View {
                     return
                 }
                 guard let pricing = viewModel.pricing else { return }
-                guard pricing.subtotal >= 30 else {
-                    minOrderError = "Minimum order is $30.00. Add more items to continue."
+                guard pricing.subtotal >= 20 else {
+                    minOrderError = "Minimum order is $20.00. Add more items to continue."
                     return
                 }
                 minOrderError = nil

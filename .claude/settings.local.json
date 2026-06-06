@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -version)",
+      "Bash(xargs cat:*)",
+      "Bash(xcodebuild -scheme GrocartInc-IOS -destination 'generic/platform=iOS Simulator' -quiet build)",
+      "Bash(sudo xcode-select *)",
+      "Bash(xcode-select -p)",
+      "Bash(swiftc --version)",
+      "Read(//Applications/**)",
+      "Bash(xargs ls *)",
+      "Bash(xcodebuild -scheme GrocartInc-IOS -destination 'platform=iOS Simulator,name=iPhone 16' -quiet build)"
+    ]
+  }
+}

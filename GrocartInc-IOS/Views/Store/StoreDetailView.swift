@@ -7,26 +7,21 @@
 
 import SwiftUI
 
-// MARK: - Preference key to track each category header's Y position
-private struct CategoryPositionKey: PreferenceKey {
-    static var defaultValue: [Int: CGFloat] = [:]
-    static func reduce(value: inout [Int: CGFloat], nextValue: () -> [Int: CGFloat]) {
-        value.merge(nextValue()) { $1 }
-    }
-}
-
 // MARK: - Main View
 struct StoreDetailView: View {
     @StateObject private var viewModel: StoreDetailViewModel
     @ObservedObject private var cartManager = CartManager.shared
     @Environment(\.dismiss) private var dismiss
 
-    @State private var activeCategoryId: Int? = nil
-    @State private var isCategoryTap = false
+    @State private var selectedCategoryId: Int? = nil
     @State private var showCart = false
     @State private var searchText = ""
 
     private var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    private var selectedCategory: Category? {
+        viewModel.categories.first { $0.id == selectedCategoryId }
+    }
 
     private var searchResults: [(product: Product, category: Category)] {
         guard isSearching else { return [] }
@@ -70,43 +65,126 @@ struct StoreDetailView: View {
         }
         .navigationBarHidden(true)
         .onAppear { viewModel.loadCategories() }
+        .onChange(of: viewModel.categories.count) { _ in
+            if selectedCategoryId == nil { selectedCategoryId = viewModel.categories.first?.id }
+        }
         .sheet(isPresented: $showCart) { CartView() }
     }
 
     // MARK: - Content
     private var contentView: some View {
-        ScrollViewReader { productProxy in
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    storeHeader
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                storeHeader
 
-                    Section {
-                        if isSearching {
-                            searchResultsSection
-                        } else if viewModel.categories.isEmpty {
-                            emptyProductsView
-                        } else {
-                            ForEach(viewModel.categories) { category in
-                                categorySection(category)
-                            }
-                        }
-                        // Bottom padding so floating button doesn't cover last items
-                        Color.clear.frame(height: 90)
-                    } header: {
-                        if !isSearching {
-                            categoryBar(proxy: productProxy)
-                        }
+                Section {
+                    if isSearching {
+                        searchResultsSection
+                    } else if viewModel.categories.isEmpty {
+                        emptyProductsView
+                    } else {
+                        categoryProductsSection
+                    }
+                    Color.clear.frame(height: 90)
+                } header: {
+                    if !isSearching {
+                        categoryBar
                     }
                 }
             }
-            .coordinateSpace(name: "scroll")
-            .onPreferenceChange(CategoryPositionKey.self) { positions in
-                guard !isCategoryTap else { return }
-                updateActiveCategory(from: positions)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            floatingCartButton
+        }
+    }
+
+    // MARK: - Category Bar (horizontal chips, no scroll-position tracking)
+    private var categoryBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(viewModel.categories) { category in
+                    let isActive = selectedCategoryId == category.id
+                    Button(action: { selectedCategoryId = category.id }) {
+                        Text(category.name)
+                            .font(.system(size: 13, weight: isActive ? .semibold : .regular))
+                            .foregroundColor(isActive ? .white : .grocartPrimary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(isActive ? Color.grocartGreen : Color.grocartSecondaryBackground)
+                            .cornerRadius(20)
+                    }
+                }
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                floatingCartButton
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .background(Color.grocartBackground)
+        .overlay(
+            Rectangle()
+                .fill(Color.gray.opacity(0.12))
+                .frame(height: 1),
+            alignment: .bottom
+        )
+    }
+
+    // MARK: - Selected Category Products
+    @ViewBuilder
+    private var categoryProductsSection: some View {
+        if let category = selectedCategory {
+            if category.products.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "basket")
+                        .font(.system(size: 36))
+                        .foregroundColor(.grocartSecondary.opacity(0.4))
+                    Text("No products in this category")
+                        .font(.system(size: 14))
+                        .foregroundColor(.grocartSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 60)
+            } else {
+                LazyVGrid(columns: gridColumns, spacing: 14) {
+                    ForEach(category.products) { product in
+                        StoreProductCard(
+                            product: product,
+                            categoryName: category.name,
+                            store: viewModel.store
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
             }
+        }
+    }
+
+    // MARK: - Search Results
+    @ViewBuilder
+    private var searchResultsSection: some View {
+        if searchResults.isEmpty {
+            VStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 36))
+                    .foregroundColor(.grocartSecondary)
+                Text("No results for \"\(searchText)\"")
+                    .font(.system(size: 14))
+                    .foregroundColor(.grocartSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 60)
+        } else {
+            LazyVGrid(columns: gridColumns, spacing: 14) {
+                ForEach(searchResults, id: \.product.id) { item in
+                    StoreProductCard(
+                        product: item.product,
+                        categoryName: item.category.name,
+                        store: viewModel.store
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
     }
 
@@ -172,7 +250,6 @@ struct StoreDetailView: View {
                     )
                 }
 
-                // Gradient overlay at bottom
                 LinearGradient(
                     colors: [Color.clear, Color.black.opacity(0.5)],
                     startPoint: .top, endPoint: .bottom
@@ -183,7 +260,6 @@ struct StoreDetailView: View {
 
             // Store info row
             HStack(alignment: .top, spacing: 14) {
-                // Logo
                 if let logoUrl = viewModel.store.logoUrl, let url = URL(string: logoUrl) {
                     AsyncImage(url: url) { phase in
                         if case .success(let image) = phase {
@@ -213,12 +289,6 @@ struct StoreDetailView: View {
                     }
 
                     HStack(spacing: 12) {
-                        Label(viewModel.store.formattedDeliveryFee, systemImage: "bicycle")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.grocartGreen)
-
-                        Text("·").foregroundColor(.grocartSecondary)
-
                         Text(viewModel.store.formattedMinOrder)
                             .font(.system(size: 12))
                             .foregroundColor(.grocartSecondary)
@@ -256,145 +326,11 @@ struct StoreDetailView: View {
         }
     }
 
-    // MARK: - Sticky Category Bar
-    private func categoryBar(proxy: ScrollViewProxy) -> some View {
-        ScrollViewReader { chipProxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(viewModel.categories) { category in
-                        let isActive = activeCategoryId == category.id
-
-                        Button(action: {
-                            isCategoryTap = true
-                            activeCategoryId = category.id
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                proxy.scrollTo(category.id, anchor: .top)
-                            }
-                            // Re-enable scroll-driven updates after animation settles
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                isCategoryTap = false
-                            }
-                        }) {
-                            Text(category.name)
-                                .font(.system(size: 13, weight: isActive ? .semibold : .regular))
-                                .foregroundColor(isActive ? .white : .grocartPrimary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(isActive ? Color.grocartGreen : Color.grocartSecondaryBackground)
-                                .cornerRadius(20)
-                        }
-                        .id("chip_\(category.id)")
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-            .background(Color.grocartBackground)
-            .overlay(
-                Rectangle()
-                    .fill(Color.gray.opacity(0.12))
-                    .frame(height: 1),
-                alignment: .bottom
-            )
-            .onChange(of: activeCategoryId) { id in
-                guard let id else { return }
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    chipProxy.scrollTo("chip_\(id)", anchor: .center)
-                }
-            }
-        }
-    }
-
-    // MARK: - Search Results
-    @ViewBuilder
-    private var searchResultsSection: some View {
-        if searchResults.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 36))
-                    .foregroundColor(.grocartSecondary)
-                Text("No results for \"\(searchText)\"")
-                    .font(.system(size: 14))
-                    .foregroundColor(.grocartSecondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 60)
-        } else {
-            LazyVGrid(columns: gridColumns, spacing: 14) {
-                ForEach(searchResults, id: \.product.id) { item in
-                    StoreProductCard(
-                        product: item.product,
-                        categoryName: item.category.name,
-                        store: viewModel.store
-                    )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-        }
-    }
-
-    // MARK: - Category + Products Section
-    private func categorySection(_ category: Category) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Category title — used as anchor + position reporter
-            Text(category.name)
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(.grocartPrimary)
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-                .id(category.id)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: CategoryPositionKey.self,
-                            value: [category.id: geo.frame(in: .named("scroll")).minY]
-                        )
-                    }
-                )
-
-            if category.products.isEmpty {
-                Text("No products available")
-                    .font(.system(size: 13))
-                    .foregroundColor(.grocartSecondary)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-            } else {
-                LazyVGrid(columns: gridColumns, spacing: 14) {
-                    ForEach(category.products) { product in
-                        StoreProductCard(
-                            product: product,
-                            categoryName: category.name,
-                            store: viewModel.store
-                        )
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-        }
-    }
-
-    // MARK: - Active Category Detection
-    private func updateActiveCategory(from positions: [Int: CGFloat]) {
-        // Sticky bar height ~55pt; category that has just scrolled past it is active
-        let threshold: CGFloat = 60
-        let passed = positions.filter { $0.value < threshold }
-        if let current = passed.max(by: { $0.value < $1.value }) {
-            if activeCategoryId != current.key {
-                activeCategoryId = current.key
-            }
-        } else if activeCategoryId == nil, let first = viewModel.categories.first {
-            activeCategoryId = first.id
-        }
-    }
-
     // MARK: - Loading
     private var loadingView: some View {
         VStack(spacing: 16) {
             Spacer()
-            ProgressView()
-                .scaleEffect(1.2)
+            ProgressView().scaleEffect(1.2)
             Text("Loading products...")
                 .font(.system(size: 14))
                 .foregroundColor(.grocartSecondary)
@@ -548,7 +484,6 @@ struct StoreProductCard: View {
                 Spacer()
 
                 if qty > 0 {
-                    // Stepper
                     HStack(spacing: 0) {
                         Button(action: { cartManager.decrement(productId: product.id) }) {
                             Image(systemName: "minus")

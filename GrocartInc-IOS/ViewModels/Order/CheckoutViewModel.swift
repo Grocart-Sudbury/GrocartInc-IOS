@@ -63,18 +63,40 @@ final class CheckoutViewModel: ObservableObject {
     @Published var couponError: String? = nil
     @Published var validatedDiscount: Double = 0
 
+    // MARK: - Uber Delivery Quote
+    @Published var deliveryQuote: UberDeliveryQuoteResponse? = nil
+    @Published var isLoadingDeliveryQuote = false
+
     // MARK: - Dependencies
     @Published var pricing: CartPricingResponse
     private let cartManager = CartManager.shared
     private let repository = OrderRepository.shared
     private let addressRepo = AddressRepository.shared
+    private let uberRepo = UberRepository.shared
 
     // MARK: - Computed
+    var effectiveShippingCost: Double {
+        guard orderType == .delivery else { return 0 }
+        if let quote = deliveryQuote, quote.deliveryPossible {
+            return Double(quote.deliveryFeeCents) / 100.0
+        }
+        return pricing.shippingCost
+    }
+
+    var formattedEffectiveShipping: String {
+        guard orderType == .delivery else { return "Free" }
+        if isLoadingDeliveryQuote { return "Calculating..." }
+        if let quote = deliveryQuote {
+            return quote.deliveryPossible ? (quote.deliveryFeeFormatted ?? pricing.formattedShipping) : "Unavailable"
+        }
+        return pricing.formattedShipping
+    }
+
     var totalWithTip: Double {
         if orderType == .pickup {
             return pricing.subtotal + pricing.tax - validatedDiscount
         }
-        return pricing.total - validatedDiscount + tipAmount
+        return pricing.subtotal + pricing.tax + effectiveShippingCost + pricing.serviceFee - validatedDiscount + tipAmount
     }
     var formattedTotal: String { String(format: "$%.2f", totalWithTip) }
 
@@ -82,10 +104,24 @@ final class CheckoutViewModel: ObservableObject {
         (0..<7).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: Date()) }
     }
 
+    var requiresUberCheck: Bool {
+        cartManager.store?.id == 4 && !isSundayDelivery
+    }
+
+    private var isSundayDelivery: Bool {
+        Calendar.current.component(.weekday, from: selectedDate) == 1
+    }
+
+    static let minimumOrderAmount: Double = 20.0
+
+    var isBelowMinimum: Bool { pricing.subtotal < CheckoutViewModel.minimumOrderAmount }
+
     var isFormValid: Bool {
+        guard !isBelowMinimum else { return false }
         switch orderType {
         case .delivery:
-            return selectedAddress != nil && selectedSlot != nil && !availableSlots.isEmpty
+            let quoteOk = !requiresUberCheck || (deliveryQuote?.deliveryPossible == true)
+            return selectedAddress != nil && selectedSlot != nil && !availableSlots.isEmpty && quoteOk
         case .pickup:
             return !firstName.isEmpty && !lastName.isEmpty && !email.isEmpty && !phone.isEmpty
                 && selectedPickupSlot != nil
@@ -117,10 +153,38 @@ final class CheckoutViewModel: ObservableObject {
         city       = a.city
         province   = a.province
         postalCode = a.postalCode
-        // Preserve user email from session
         if email.isEmpty {
             email = SessionManager.shared.currentUser?.email ?? ""
         }
+        Task { await fetchDeliveryQuote(for: a) }
+    }
+
+    func fetchDeliveryQuote(for addr: CustomerAddress? = nil) async {
+        let target = addr ?? selectedAddress
+        guard let a = target, orderType == .delivery else { return }
+
+        // Only check for store 4; other stores are always deliverable
+        guard cartManager.store?.id == 4 else {
+            deliveryQuote = nil
+            return
+        }
+
+        // Sundays: delivery available everywhere in Winnipeg — skip API call
+        if isSundayDelivery {
+            deliveryQuote = nil
+            return
+        }
+
+        let dropoff = "\(a.address), \(a.city), \(a.province) \(a.postalCode), CA"
+        isLoadingDeliveryQuote = true
+        deliveryQuote = nil
+        do {
+            let quote = try await uberRepo.fetchDeliveryQuote(dropoffAddress: dropoff)
+            deliveryQuote = quote
+        } catch {
+            deliveryQuote = nil
+        }
+        isLoadingDeliveryQuote = false
     }
 
     private func loadDefaultAddress() {
@@ -271,7 +335,7 @@ final class CheckoutViewModel: ObservableObject {
                 preferredPickupTimeSlot: nil,
                 subtotal: pricing.subtotal,
                 tax: pricing.tax,
-                shippingCost: pricing.shippingCost,
+                shippingCost: effectiveShippingCost,
                 serviceFee: pricing.serviceFee,
                 discount: validatedDiscount,
                 tipAmount: tipAmount,

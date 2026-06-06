@@ -36,7 +36,9 @@ struct CheckoutView: View {
                         pickupInfoSection
                         pickupScheduleSection
                     }
-                    promoCodeSection
+                    if viewModel.orderType == .delivery {
+                        promoCodeSection
+                    }
                     paymentSection
                     orderSummarySection
                     Spacer().frame(height: 90)
@@ -86,16 +88,26 @@ struct CheckoutView: View {
         .onAppear {
             if viewModel.orderType == .delivery {
                 Task { await viewModel.fetchSlotsForSelectedDate() }
+                if viewModel.deliveryQuote == nil && !viewModel.isLoadingDeliveryQuote {
+                    Task { await viewModel.fetchDeliveryQuote() }
+                }
             }
+        }
+        .onChange(of: viewModel.selectedAddress?.id) { _ in
+            Task { await viewModel.fetchDeliveryQuote() }
         }
         .onChange(of: viewModel.selectedDate) { _ in
             if viewModel.orderType == .delivery {
                 Task { await viewModel.fetchSlotsForSelectedDate() }
+                Task { await viewModel.fetchDeliveryQuote() }
             }
         }
         .onChange(of: viewModel.orderType) { type in
             if type == .delivery {
-                Task { await viewModel.fetchSlotsForSelectedDate() }
+                Task {
+                    await viewModel.fetchSlotsForSelectedDate()
+                    await viewModel.fetchDeliveryQuote()
+                }
             }
         }
         .onChange(of: viewModel.pendingPaymentOrder?.id) { orderId in
@@ -296,6 +308,8 @@ struct CheckoutView: View {
                 emptyAddressPrompt
             }
 
+            deliveryQuoteBanner
+
             // Delivery notes always visible
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $viewModel.deliveryNotes)
@@ -314,6 +328,77 @@ struct CheckoutView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private var deliveryQuoteBanner: some View {
+        if viewModel.orderType == .delivery && viewModel.selectedAddress != nil && viewModel.requiresUberCheck {
+            if viewModel.isLoadingDeliveryQuote {
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.8)
+                    Text("Checking delivery availability...")
+                        .font(.system(size: 13))
+                        .foregroundColor(.grocartSecondary)
+                }
+                .padding(.vertical, 6)
+            } else if let quote = viewModel.deliveryQuote {
+                if quote.deliveryPossible {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.grocartGreen)
+                        Text("Delivery available — \(quote.deliveryFeeFormatted ?? "")")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.grocartGreen)
+                        if let eta = quote.estimatedPickupMinutes {
+                            Text("· ~\(eta) min pickup")
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                } else {
+                    deliveryUnavailableCard
+                }
+            } else {
+                // Quote fetch failed — treat as unavailable
+                deliveryUnavailableCard
+            }
+        }
+    }
+
+    private var deliveryUnavailableCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(.red)
+                Text("Delivery not available to this address")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.red)
+            }
+            Text("Unfortunately, we can't deliver to your selected address. On Sundays, delivery is available anywhere in Winnipeg — or you can pick up your order from the store instead.")
+                .font(.system(size: 12))
+                .foregroundColor(.red.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: { viewModel.orderType = .pickup }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "storefront.fill")
+                        .font(.system(size: 13))
+                    Text("Switch to Pickup")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(Color.red)
+                .cornerRadius(10)
+            }
+        }
+        .padding(12)
+        .background(Color.red.opacity(0.08))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.3), lineWidth: 1.5))
     }
 
     private func selectedAddressCard(_ addr: CustomerAddress) -> some View {
@@ -615,7 +700,8 @@ struct CheckoutView: View {
             pricingRow("Subtotal", viewModel.pricing.formattedSubtotal)
             pricingRow("Tax (HST 13%)", viewModel.pricing.formattedTax)
             if viewModel.orderType == .delivery {
-                pricingRow("Shipping", viewModel.pricing.formattedShipping)
+                pricingRow("Shipping", viewModel.formattedEffectiveShipping,
+                           color: viewModel.deliveryQuote?.deliveryPossible == false ? .red : .grocartPrimary)
                 if viewModel.pricing.serviceFee > 0 {
                     pricingRow("Service Fee", viewModel.pricing.formattedServiceFee)
                 }
@@ -637,6 +723,22 @@ struct CheckoutView: View {
                 Text(viewModel.formattedTotal)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.grocartGreen)
+            }
+
+            if viewModel.isBelowMinimum {
+                HStack(spacing: 8) {
+                    Image(systemName: "cart.badge.minus")
+                        .font(.system(size: 13))
+                        .foregroundColor(.orange)
+                    Text("Minimum order is $20.00. Add more items to proceed.")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.orange)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.08))
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.orange.opacity(0.3), lineWidth: 1))
             }
         }
     }

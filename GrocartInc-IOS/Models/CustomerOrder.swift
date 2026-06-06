@@ -108,6 +108,11 @@ struct CustomerOrderItemSummary: Decodable, Identifiable {
     let priceAtPurchase: Double
 
     var formattedPrice: String { String(format: "$%.2f", priceAtPurchase * Double(quantity)) }
+
+    enum CodingKeys: String, CodingKey {
+        case id = "productId"
+        case productName, quantity, priceAtPurchase
+    }
 }
 
 // MARK: - Full Order Detail
