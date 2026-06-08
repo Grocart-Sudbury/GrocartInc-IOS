@@ -493,18 +493,9 @@ struct StoreCard: View {
                     .foregroundColor(.grocartSecondary)
                     .lineLimit(1)
 
-                HStack(spacing: 8) {
-                    Label(store.formattedDeliveryFee, systemImage: "bicycle")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.grocartGreen)
-
-                    Text("·")
-                        .foregroundColor(.grocartSecondary)
-
-                    Text(store.formattedMinOrder)
-                        .font(.system(size: 11))
-                        .foregroundColor(.grocartSecondary)
-                }
+                Text(store.formattedMinOrder)
+                    .font(.system(size: 11))
+                    .foregroundColor(.grocartSecondary)
             }
             .padding(10)
         }

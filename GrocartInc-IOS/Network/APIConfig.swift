@@ -18,9 +18,9 @@ struct APIConfig {
     
     // MARK: - Base URL
   
-    static let baseURL = "http://147.93.114.66:9092/api"
+    //static let baseURL = "http://147.93.114.66:9092/api"
     //static let baseURL = "http://localhost:9091/api"
-   //static let baseURL = "https://api.grocartinc.ca/api"
+   static let baseURL = "https://api.grocartinc.ca/api"
    
     
     // MARK: - Auth Endpoints
