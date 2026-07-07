@@ -4,6 +4,7 @@
 import SwiftUI
 
 struct ProfileView: View {
+    @Environment(\.openURL) private var openURL
     @StateObject private var profileVM = ProfileViewModel()
     @ObservedObject private var sessionManager = SessionManager.shared
     @State private var showSignOutAlert = false
@@ -84,6 +85,13 @@ struct ProfileView: View {
                                 NavigationLink(destination: destination) {
                                     MenuRow(icon: icon, title: title, color: color)
                                 }
+                            }
+                            Button {
+                                if let url = URL(string: "https://grocartinc.ca/support") {
+                                    openURL(url)
+                                }
+                            } label: {
+                                MenuRow(icon: "questionmark.circle.fill", title: "Support", color: .purple)
                             }
                         }
                         .background(Color.grocartSecondaryBackground)
