@@ -18,9 +18,9 @@ struct APIConfig {
     
     // MARK: - Base URL
   
-    //static let baseURL = "http://147.93.114.66:9092/api"
+    static let baseURL = "http://147.93.114.66:9092/api"
     //static let baseURL = "http://localhost:9091/api"
-   static let baseURL = "https://api.grocartinc.ca/api"
+ // static let baseURL = "https://api.grocartinc.ca/api"
    
     
     // MARK: - Auth Endpoints
@@ -51,6 +51,7 @@ struct APIConfig {
 
     struct Orders {
         static let place = "\(baseURL)/orders"
+        static let topProducts = "\(baseURL)/orders/top-products"
         static func byId(_ id: Int) -> String { "\(baseURL)/orders/\(id)" }
         static func track(_ trackingId: String) -> String { "\(baseURL)/orders/track/\(trackingId)" }
     }

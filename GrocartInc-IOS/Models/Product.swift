@@ -59,3 +59,31 @@ struct Product: Codable, Identifiable, Sendable {
         String(format: "$%.2f", displayPrice)
     }
 }
+
+// MARK: - Top Ordered Product (GET /orders/top-products)
+struct TopOrderedProduct: Codable, Identifiable, Sendable {
+    let id: Int
+    let product: String
+    let originalPrice: Double
+    let offerPrice: Double?
+    let description: String
+    let stock: Int
+    let quantity: String
+    let imageUrl: String
+    let totalOrderedQuantity: Int
+
+    // Bridge to the shared Product model for reuse in product cards.
+    var asProduct: Product {
+        Product(
+            id: id,
+            product: product,
+            originalPrice: originalPrice,
+            offerPrice: offerPrice,
+            description: description,
+            stock: stock,
+            quantity: quantity,
+            imageUrl: imageUrl,
+            productType: "REGULAR"
+        )
+    }
+}

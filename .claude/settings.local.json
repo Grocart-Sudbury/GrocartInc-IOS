@@ -9,7 +9,8 @@
       "Bash(swiftc --version)",
       "Read(//Applications/**)",
       "Bash(xargs ls *)",
-      "Bash(xcodebuild -scheme GrocartInc-IOS -destination 'platform=iOS Simulator,name=iPhone 16' -quiet build)"
+      "Bash(xcodebuild -scheme GrocartInc-IOS -destination 'platform=iOS Simulator,name=iPhone 16' -quiet build)",
+      "Bash(xcodebuild -project GrocartInc-IOS.xcodeproj -scheme GrocartInc-IOS -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' build CODE_SIGNING_ALLOWED=NO -quiet)"
     ]
   }
 }

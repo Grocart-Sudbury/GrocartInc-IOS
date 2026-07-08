@@ -20,8 +20,9 @@ final class HomeViewModel: ObservableObject {
 
     // MARK: - Published Properties
     @Published var stores: [Store] = []
-    @Published var banners: [PromoBanner] = []
+    @Published var topProducts: [TopOrderedProduct] = []
     @Published var isLoadingStores: Bool = false
+    @Published var isLoadingTopProducts: Bool = false
     @Published var isLoading: Bool = false
     @Published var isRefreshing: Bool = false
     @Published var errorMessage: String?
@@ -30,12 +31,12 @@ final class HomeViewModel: ObservableObject {
 
     // MARK: - Dependencies
     private let storeRepository: StoreRepository
-    private let homeRepository: HomeRepository
+    private let orderRepository: OrderRepository
 
     // MARK: - Init
     init(productRepository: ProductRepositoryProtocol? = nil) {
         self.storeRepository = StoreRepository.shared
-        self.homeRepository = HomeRepository.shared
+        self.orderRepository = OrderRepository.shared
 
         // Re-fetch stores whenever the city resolves or changes.
         // Use `scan` to track whether we passed through "Locating..." so that
@@ -51,25 +52,10 @@ final class HomeViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - Load Data
-    func loadData() {
-        guard !isLoading else { return }
-        isLoading = true
-        errorMessage = nil
-
-        Task {
-            // Banners are always live — fetch independently and hide on error
-            self.banners = (try? await homeRepository.fetchBanners()) ?? []
-            self.isLoading = false
-        }
-    }
-
     // MARK: - Pull to Refresh
     func refresh() async {
         isRefreshing = true
         errorMessage = nil
-
-        self.banners = (try? await homeRepository.fetchBanners()) ?? []
 
         let city = LocationState.shared.cityName
         if !city.isEmpty, city != "Locating...", city != "Location Off" {
@@ -77,6 +63,18 @@ final class HomeViewModel: ObservableObject {
         }
 
         isRefreshing = false
+    }
+
+    // MARK: - Load Top Products (per-store, public)
+    func loadTopProducts(storeId: Int) async {
+        isLoadingTopProducts = true
+        do {
+            topProducts = try await orderRepository.fetchTopProducts(storeId: storeId)
+        } catch {
+            // Silently fail — section just stays hidden
+            topProducts = []
+        }
+        isLoadingTopProducts = false
     }
 
     // MARK: - Load Stores
@@ -88,6 +86,13 @@ final class HomeViewModel: ObservableObject {
             // Silently fail — stores list just stays empty
         }
         isLoadingStores = false
+
+        // Top products are per-store — use the first (nearest) store.
+        if let firstStore = stores.first {
+            await loadTopProducts(storeId: firstStore.id)
+        } else {
+            topProducts = []
+        }
     }
 
 }

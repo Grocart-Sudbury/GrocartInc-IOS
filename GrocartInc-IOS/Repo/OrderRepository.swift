@@ -14,6 +14,15 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "OrderRep
 final class OrderRepository: @unchecked Sendable {
 
     static let shared = OrderRepository()
+
+    // Public endpoint — no auth interceptor needed for top-products
+    private let publicSession: Session = {
+        let config = URLSessionConfiguration.af.default
+        config.timeoutIntervalForRequest = APIConfig.requestTimeout
+        config.timeoutIntervalForResource = APIConfig.resourceTimeout
+        return Session(configuration: config)
+    }()
+
     private init() {}
 
     func fetchActiveOrders() async throws -> [ActiveOrder] {
@@ -44,6 +53,42 @@ final class OrderRepository: @unchecked Sendable {
         case .failure(let afError):
             let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
             logger.error("ACTIVE ORDERS FAILED: \(body)")
+            if response.response?.statusCode == 401 { throw NetworkError.unauthorized }
+            throw NetworkError.unknown(afError)
+        }
+    }
+
+    func fetchTopProducts(storeId: Int) async throws -> [TopOrderedProduct] {
+        logger.info("TOP PRODUCTS REQUEST: GET \(APIConfig.Orders.topProducts, privacy: .public)?storeId=\(storeId)")
+
+        let task = publicSession.request(
+            APIConfig.Orders.topProducts,
+            method: .get,
+            parameters: ["storeId": storeId],
+            encoding: URLEncoding.queryString
+        )
+        .validate(statusCode: 200..<300)
+        .serializingData()
+
+        let response = await task.response
+        logger.info("TOP PRODUCTS STATUS: \(response.response?.statusCode ?? -1)")
+
+        switch response.result {
+        case .success(let data):
+            let raw = String(data: data, encoding: .utf8) ?? "nil"
+            logger.info("TOP PRODUCTS RESPONSE BODY: \(raw, privacy: .public)")
+            do {
+                let products = try JSONDecoder().decode([TopOrderedProduct].self, from: data)
+                logger.info("TOP PRODUCTS SUCCESS: \(products.count) product(s) returned")
+                return products
+            } catch {
+                logger.error("TOP PRODUCTS DECODE ERROR: \(error, privacy: .public)")
+                throw NetworkError.unknown(error)
+            }
+        case .failure(let afError):
+            let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
+            logger.error("TOP PRODUCTS FAILED [\(response.response?.statusCode ?? -1)]: \(afError.localizedDescription, privacy: .public)")
+            logger.error("TOP PRODUCTS ERROR BODY: \(body, privacy: .public)")
             if response.response?.statusCode == 401 { throw NetworkError.unauthorized }
             throw NetworkError.unknown(afError)
         }

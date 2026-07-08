@@ -23,11 +23,11 @@ struct HomeTabView: View {
                         // Header
                         headerSection
 
-                        // Promo Banners
-                        promoBannersSection
-
-                        // Stores
+                        // Stores with product previews
                         storesSection
+
+                        // Top ordered products
+                        topProductsSection
 
                         // Active Orders (shown when logged in and orders exist)
                         ActiveOrdersSection()
@@ -42,7 +42,6 @@ struct HomeTabView: View {
             .navigationBarHidden(true)
         }
         .onAppear {
-            viewModel.loadData()
             LocationManager.shared.requestLocationIfNeeded()
         }
         .onChange(of: locationState.cityName) { newValue in
@@ -107,29 +106,9 @@ struct HomeTabView: View {
         .padding(.top, 8)
     }
     
-    // MARK: - Promo Banners
-    @ViewBuilder
-    private var promoBannersSection: some View {
-        if !viewModel.banners.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(viewModel.banners) { banner in
-                        PromoBannerCard(
-                            title: banner.title,
-                            subtitle: banner.subtitle,
-                            icon: banner.icon,
-                            color: banner.color
-                        )
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-    
     // MARK: - Stores
     private var storesSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 28) {
             HStack {
                 Text("Stores Near You")
                     .font(.system(size: 18, weight: .bold))
@@ -171,13 +150,30 @@ struct HomeTabView: View {
                 .frame(height: 150)
                 .padding(.horizontal, 20)
             } else {
+                ForEach(viewModel.stores) { store in
+                    HomeStoreSection(store: store)
+                }
+            }
+        }
+    }
+
+    // MARK: - Top Products
+    @ViewBuilder
+    private var topProductsSection: some View {
+        if !viewModel.topProducts.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Text("Top Products")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
-                        ForEach(viewModel.stores) { store in
-                            NavigationLink(destination: StoreDetailView(store: store)) {
-                                StoreCard(store: store)
-                            }
-                            .buttonStyle(.plain)
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.topProducts) { item in
+                            HomeProductCard(product: item.asProduct)
                         }
                     }
                     .padding(.horizontal, 20)
@@ -185,150 +181,7 @@ struct HomeTabView: View {
             }
         }
     }
-    
-}
 
-// MARK: - Promo Banner Card
-struct PromoBannerCard: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text(subtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-                
-            }
-            
-            Spacer()
-            
-            Image(systemName: icon)
-                .font(.system(size: 36))
-                .foregroundColor(.white.opacity(0.3))
-        }
-        .padding(18)
-        .frame(width: 260)
-        .background(
-            LinearGradient(
-                colors: [color, color.opacity(0.8)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(16)
-    }
-}
-
-// MARK: - Product Deal Card (Horizontal Scroll)
-struct ProductDealCard: View {
-    let product: Product
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Product Image
-            ZStack(alignment: .topLeading) {
-                AsyncImage(url: URL(string: product.imageUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 140, height: 110)
-                            .clipped()
-                            .cornerRadius(12)
-                    case .failure:
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.grocartSecondaryBackground)
-                            .frame(width: 140, height: 110)
-                            .overlay(
-                                Image(systemName: "basket.fill")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(.grocartGreen.opacity(0.3))
-                            )
-                    default:
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.grocartSecondaryBackground)
-                            .frame(width: 140, height: 110)
-                            .overlay(ProgressView())
-                    }
-                }
-                
-                // Discount badge
-                if product.isOnSale {
-                    Text("-\(product.discountPercentage)%")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color.red)
-                        .cornerRadius(6)
-                        .padding(6)
-                }
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(product.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.grocartPrimary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                
-                Text(product.quantity)
-                    .font(.system(size: 11))
-                    .foregroundColor(.grocartSecondary)
-                
-                HStack(spacing: 4) {
-                    Text(product.formattedOfferPrice)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.grocartGreen)
-                    
-                    if product.isOnSale {
-                        Text(product.formattedOriginalPrice)
-                            .font(.system(size: 11))
-                            .foregroundColor(.grocartSecondary)
-                            .strikethrough()
-                    }
-                    
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, 4)
-            
-            // Add to cart button
-            Button(action: {}) {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("Add")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 32)
-                .background(product.isInStock ? Color.grocartGreen : Color.gray)
-                .cornerRadius(8)
-            }
-            .disabled(!product.isInStock)
-            .padding(.horizontal, 4)
-        }
-        .padding(10)
-        .frame(width: 160)
-        .background(Color.grocartBackground)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.gray.opacity(0.12), lineWidth: 1)
-        )
-    }
 }
 
 // MARK: - Product Grid Card (Search results / Grid layout)
@@ -439,70 +292,180 @@ struct ProductGridCard: View {
     }
 }
 
-// MARK: - Store Card
-struct StoreCard: View {
+// MARK: - Home Store Section (store header + randomized product preview)
+struct HomeStoreSection: View {
     let store: Store
+    @StateObject private var viewModel: HomeStoreProductsViewModel
+
+    init(store: Store) {
+        self.store = store
+        _viewModel = StateObject(wrappedValue: HomeStoreProductsViewModel(store: store))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Banner
-            ZStack(alignment: .bottomLeading) {
-                if let bannerUrl = store.bannerUrl, let url = URL(string: bannerUrl) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        default:
-                            Color.grocartSecondaryBackground
-                        }
-                    }
-                } else {
-                    LinearGradient(
-                        colors: [Color.grocartGreen.opacity(0.7), Color.grocartGreen],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
+        VStack(alignment: .leading, spacing: 14) {
+            // Store header + View All
+            NavigationLink(destination: StoreDetailView(store: store)) {
+                HStack(spacing: 12) {
+                    storeLogo
 
-                // Logo overlay
-                if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let image) = phase {
-                            image.resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 44, height: 44)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white, lineWidth: 2))
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(store.name)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.grocartPrimary)
+                            .lineLimit(1)
+                        Text(store.address)
+                            .font(.system(size: 12))
+                            .foregroundColor(.grocartSecondary)
+                            .lineLimit(1)
                     }
-                    .padding(10)
+
+                    Spacer()
+
+                    HStack(spacing: 2) {
+                        Text("View All")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.grocartGreen)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.grocartGreen)
+                    }
                 }
             }
-            .frame(width: 220, height: 110)
-            .clipped()
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
 
-            // Info
-            VStack(alignment: .leading, spacing: 6) {
-                Text(store.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.grocartPrimary)
-                    .lineLimit(1)
-
-                Text(store.address)
-                    .font(.system(size: 11))
-                    .foregroundColor(.grocartSecondary)
-                    .lineLimit(1)
-
-                Text(store.formattedMinOrder)
-                    .font(.system(size: 11))
-                    .foregroundColor(.grocartSecondary)
+            // Product preview row
+            if viewModel.isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .frame(height: 180)
+            } else if !viewModel.products.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(viewModel.products) { item in
+                            NavigationLink(destination: ProductDetailView(
+                                product: item.product,
+                                categoryName: item.categoryName,
+                                store: store
+                            )) {
+                                HomeProductCard(product: item.product)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
             }
-            .padding(10)
         }
-        .frame(width: 220)
+        .task { await viewModel.loadIfNeeded() }
+    }
+
+    @ViewBuilder
+    private var storeLogo: some View {
+        if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
+            AsyncImage(url: url) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Color.grocartSecondaryBackground
+                }
+            }
+            .frame(width: 44, height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.15), lineWidth: 1))
+        } else {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.grocartGreen.opacity(0.15))
+                .frame(width: 44, height: 44)
+                .overlay(
+                    Image(systemName: "storefront.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.grocartGreen)
+                )
+        }
+    }
+}
+
+// MARK: - Home Product Card (compact preview, tappable)
+struct HomeProductCard: View {
+    let product: Product
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topLeading) {
+                AsyncImage(url: URL(string: product.imageUrl)) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 140, height: 110)
+                            .clipped()
+                            .cornerRadius(12)
+                    default:
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.grocartSecondaryBackground)
+                            .frame(width: 140, height: 110)
+                            .overlay(
+                                Image(systemName: "basket.fill")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.grocartGreen.opacity(0.3))
+                            )
+                    }
+                }
+
+                if product.isOnSale {
+                    Text("-\(product.discountPercentage)%")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.red)
+                        .cornerRadius(6)
+                        .padding(6)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(product.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.grocartPrimary)
+                    .lineLimit(2)
+                    .frame(width: 140, height: 34, alignment: .topLeading)
+
+                Text(product.quantity)
+                    .font(.system(size: 11))
+                    .foregroundColor(.grocartSecondary)
+
+                HStack(spacing: 4) {
+                    Text(product.formattedOfferPrice)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.grocartGreen)
+
+                    if product.isOnSale {
+                        Text(product.formattedOriginalPrice)
+                            .font(.system(size: 11))
+                            .foregroundColor(.grocartSecondary)
+                            .strikethrough()
+                    }
+
+                    Spacer()
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding(10)
+        .frame(width: 160)
         .background(Color.grocartBackground)
         .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.12), lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.gray.opacity(0.12), lineWidth: 1)
+        )
     }
 }
 
