@@ -16,11 +16,7 @@ struct SearchView: View {
                 Color.grocartBackground.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    if viewModel.selectedStore == nil {
-                        storePicker
-                    } else {
-                        searchContent
-                    }
+                    storePicker
                 }
             }
             .navigationTitle("Search")
@@ -73,178 +69,11 @@ struct SearchView: View {
     private var storeList: some View {
         VStack(spacing: 12) {
             ForEach(viewModel.stores) { store in
-                Button(action: { viewModel.selectStore(store) }) {
+                NavigationLink(destination: StoreDetailView(store: store)) {
                     SearchStoreRow(store: store)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 20)
-            }
-        }
-    }
-
-    // MARK: - Search Content (store selected)
-
-    private var searchContent: some View {
-        VStack(spacing: 0) {
-            // Selected store header + change button
-            selectedStoreHeader
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
-
-            // Search bar
-            searchBar
-                .padding(.horizontal, 20)
-                .padding(.bottom, 14)
-
-            Divider()
-
-            // Results / empty state
-            if viewModel.isLoadingProducts {
-                Spacer()
-                ProgressView()
-                Spacer()
-            } else if !viewModel.searchText.isEmpty {
-                searchResultsList
-            } else {
-                idleSearchState
-            }
-        }
-    }
-
-    private var selectedStoreHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "storefront.fill")
-                .font(.system(size: 14))
-                .foregroundColor(.grocartGreen)
-
-            Text(viewModel.selectedStore?.name ?? "")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.grocartPrimary)
-                .lineLimit(1)
-
-            Spacer()
-
-            Button(action: { viewModel.clearStore() }) {
-                Text("Change")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.grocartGreen)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.grocartGreen.opacity(0.08))
-        .cornerRadius(12)
-    }
-
-    private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.grocartSecondary)
-
-            TextField("Search for groceries...", text: $viewModel.searchText)
-                .font(.system(size: 15))
-
-            if !viewModel.searchText.isEmpty {
-                Button(action: { viewModel.searchText = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.grocartSecondary)
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color.grocartSecondaryBackground)
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.15), lineWidth: 1))
-    }
-
-    // MARK: - Results
-
-    private var searchResultsList: some View {
-        Group {
-            if viewModel.searchResults.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 36))
-                        .foregroundColor(.grocartSecondary)
-                    Text("No results for \"\(viewModel.searchText)\"")
-                        .font(.system(size: 14))
-                        .foregroundColor(.grocartSecondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 60)
-            } else {
-                ScrollView(showsIndicators: false) {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                        ForEach(viewModel.searchResults) { result in
-                            if let store = viewModel.selectedStore {
-                                StoreProductCard(
-                                    product: result.product,
-                                    categoryName: result.categoryName,
-                                    store: store
-                                )
-                            }
-                        }
-                    }
-                    .padding(16)
-                }
-            }
-        }
-    }
-
-    // MARK: - Idle state (store selected, no query)
-
-    private var idleSearchState: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
-                if !viewModel.recentSearches.isEmpty {
-                    recentSearchesSection
-                } else {
-                    Text("Start typing to search products in \(viewModel.selectedStore?.name ?? "this store")")
-                        .font(.system(size: 14))
-                        .foregroundColor(.grocartSecondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 50)
-                }
-            }
-            .padding(20)
-        }
-    }
-
-    private var recentSearchesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Recent Searches")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.grocartPrimary)
-                Spacer()
-                Button("Clear All") { viewModel.clearAllRecent() }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.grocartGreen)
-            }
-
-            ForEach(viewModel.recentSearches, id: \.self) { query in
-                HStack(spacing: 12) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 14))
-                        .foregroundColor(.grocartSecondary)
-
-                    Button(action: { viewModel.applyRecent(query) }) {
-                        Text(query)
-                            .font(.system(size: 15))
-                            .foregroundColor(.grocartPrimary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    Button(action: { viewModel.removeRecent(query) }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.grocartSecondary)
-                    }
-                }
-                .padding(.vertical, 6)
             }
         }
     }
@@ -259,7 +88,11 @@ private struct SearchStoreRow: View {
         HStack(spacing: 14) {
             // Logo / icon
             Group {
-                if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
+                if let assetName = store.bundledIconAssetName {
+                    Image(assetName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
                     AsyncImage(url: url) { phase in
                         if case .success(let image) = phase {
                             image.resizable()

@@ -12,6 +12,7 @@ struct HomeTabView: View {
     @ObservedObject private var locationState = LocationState.shared
     @State private var showCityPicker = false
     @State private var showNotifications = false
+    @State private var showProfile = false
     
     var body: some View {
         NavigationView {
@@ -23,6 +24,9 @@ struct HomeTabView: View {
                         // Header
                         headerSection
 
+                        // Featured on Grocart (Stores Grid)
+                        featuredStoresGridSection
+
                         // Stores with product previews
                         storesSection
 
@@ -32,7 +36,7 @@ struct HomeTabView: View {
                         // Active Orders (shown when logged in and orders exist)
                         ActiveOrdersSection()
 
-                        Spacer().frame(height: 20)
+                        Spacer().frame(height: 90)
                     }
                 }
                 .refreshable {
@@ -91,28 +95,83 @@ struct HomeTabView: View {
                 }
                 .hidden()
 
-                Button(action: { showNotifications = true }) {
-                    Image(systemName: "bell")
-                        .font(.system(size: 20))
-                        .foregroundColor(.grocartPrimary)
-                        .frame(width: 42, height: 42)
-                        .background(Color.grocartSecondaryBackground)
-                        .clipShape(Circle())
+                NavigationLink(destination: ProfileView(), isActive: $showProfile) {
+                    EmptyView()
+                }
+                .hidden()
+
+                HStack(spacing: 10) {
+                    Button(action: { showNotifications = true }) {
+                        Image(systemName: "bell")
+                            .font(.system(size: 18))
+                            .foregroundColor(.grocartPrimary)
+                            .frame(width: 40, height: 40)
+                            .background(Color.grocartSecondaryBackground)
+                            .clipShape(Circle())
+                    }
+
+                    Button(action: { showProfile = true }) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.grocartPrimary)
+                            .frame(width: 40, height: 40)
+                            .background(Color.grocartSecondaryBackground)
+                            .clipShape(Circle())
+                    }
                 }
             }
-            
-}
+        }
         .padding(.horizontal, 20)
         .padding(.top, 8)
     }
     
+    // MARK: - Featured on Grocart (Store Grid)
+    private var featuredStoresGridSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Featured on Grocart")
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(.grocartPrimary)
+                .padding(.horizontal, 20)
+
+            if viewModel.isLoadingStores {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .frame(height: 120)
+            } else if !viewModel.stores.isEmpty {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 14),
+                        GridItem(.flexible(), spacing: 14)
+                    ],
+                    spacing: 14
+                ) {
+                    ForEach(viewModel.stores) { store in
+                        NavigationLink(destination: StoreDetailView(store: store)) {
+                            FeaturedStoreCard(store: store)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
     // MARK: - Stores
     private var storesSection: some View {
         VStack(alignment: .leading, spacing: 28) {
-            HStack {
-                Text("Stores Near You")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.grocartPrimary)
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Stores Near You")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+                    Text("Design preview • Sample prices")
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary)
+                }
                 Spacer()
             }
             .padding(.horizontal, 20)
@@ -366,7 +425,14 @@ struct HomeStoreSection: View {
 
     @ViewBuilder
     private var storeLogo: some View {
-        if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
+        if let assetName = store.bundledIconAssetName {
+            Image(assetName)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.15), lineWidth: 1))
+        } else if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
             AsyncImage(url: url) { phase in
                 if case .success(let image) = phase {
                     image.resizable().aspectRatio(contentMode: .fill)
@@ -466,6 +532,72 @@ struct HomeProductCard: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.gray.opacity(0.12), lineWidth: 1)
         )
+    }
+}
+
+// MARK: - Featured Store Card (2-column Grid)
+struct FeaturedStoreCard: View {
+    let store: Store
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Image header
+            storeImage
+                .frame(height: 100)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .cornerRadius(12)
+
+            // Info
+            VStack(alignment: .leading, spacing: 3) {
+                Text(store.name)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.grocartPrimary)
+                    .lineLimit(1)
+
+                Text(store.formattedDeliveryFee)
+                    .font(.system(size: 12))
+                    .foregroundColor(.grocartSecondary)
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 6)
+        }
+        .background(Color.grocartBackground)
+        .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.gray.opacity(0.12), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private var storeImage: some View {
+        if let assetName = store.bundledBannerAssetName ?? store.bundledIconAssetName {
+            Image(assetName)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else if let bannerUrl = store.bannerUrl ?? store.logoUrl, let url = URL(string: bannerUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fill)
+                default:
+                    placeholderImage
+                }
+            }
+        } else {
+            placeholderImage
+        }
+    }
+
+    private var placeholderImage: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color.grocartGreen.opacity(0.12))
+            .overlay(
+                Image(systemName: "storefront.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(.grocartGreen)
+            )
     }
 }
 

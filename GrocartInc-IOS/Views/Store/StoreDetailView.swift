@@ -231,7 +231,11 @@ struct StoreDetailView: View {
         VStack(spacing: 0) {
             // Banner
             ZStack(alignment: .bottomLeading) {
-                if let bannerUrl = viewModel.store.bannerUrl, let url = URL(string: bannerUrl) {
+                if let assetName = viewModel.store.bundledBannerAssetName {
+                    Image(assetName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if let bannerUrl = viewModel.store.bannerUrl, let url = URL(string: bannerUrl) {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
@@ -260,7 +264,17 @@ struct StoreDetailView: View {
 
             // Store info row
             HStack(alignment: .top, spacing: 14) {
-                if let logoUrl = viewModel.store.logoUrl, let url = URL(string: logoUrl) {
+                if let assetName = viewModel.store.bundledIconAssetName {
+                    Image(assetName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .padding(10)
+                        .frame(width: 64, height: 64)
+                        .background(Color.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white, lineWidth: 2))
+                        .offset(y: -20)
+                } else if let logoUrl = viewModel.store.logoUrl, let url = URL(string: logoUrl) {
                     AsyncImage(url: url) { phase in
                         if case .success(let image) = phase {
                             image.resizable().aspectRatio(contentMode: .fill)
