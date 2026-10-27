@@ -6,10 +6,12 @@
 //
 
 import SwiftUI
+import Combine
 
 struct MainTabView: View {
     @State private var selectedTab = 0
     @ObservedObject private var cartManager = CartManager.shared
+    @ObservedObject private var tabBarManager = TabBarManager.shared
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -33,12 +35,16 @@ struct MainTabView: View {
             .tint(.grocartGreen)
 
             // Floating Navigation Bar (Home, Search pill, Cart with badge)
-            floatingBottomBar
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
+            if !tabBarManager.isHidden {
+                floatingBottomBar
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .onReceive(NotificationCenter.default.publisher(for: .navigateToHome)) { _ in
+            tabBarManager.reset()
             selectedTab = 0
         }
     }
@@ -103,6 +109,64 @@ struct MainTabView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Tab Bar Manager
+final class TabBarManager: ObservableObject {
+    static let shared = TabBarManager()
+    
+    @Published var isHidden: Bool = false
+    private var hideTokens: Set<String> = []
+
+    private init() {}
+
+    func hide(token: String) {
+        hideTokens.insert(token)
+        updateVisibility()
+    }
+
+    func show(token: String) {
+        hideTokens.remove(token)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.updateVisibility()
+        }
+    }
+
+    func reset() {
+        hideTokens.removeAll()
+        updateVisibility()
+    }
+
+    private func updateVisibility() {
+        let shouldHide = !hideTokens.isEmpty
+        if isHidden != shouldHide {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isHidden = shouldHide
+            }
+        }
+    }
+}
+
+// MARK: - Hide Floating Bottom Bar View Modifier
+struct HideFloatingBottomBarModifier: ViewModifier {
+    @State private var token = UUID().uuidString
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                TabBarManager.shared.hide(token: token)
+            }
+            .onDisappear {
+                TabBarManager.shared.show(token: token)
+            }
+    }
+}
+
+extension View {
+    func hideFloatingBottomBar() -> some View {
+        self.modifier(HideFloatingBottomBarModifier())
     }
 }
 

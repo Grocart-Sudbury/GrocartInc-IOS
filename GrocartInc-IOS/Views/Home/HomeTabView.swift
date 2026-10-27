@@ -543,10 +543,9 @@ struct FeaturedStoreCard: View {
         VStack(alignment: .leading, spacing: 8) {
             // Image header
             storeImage
-                .frame(height: 100)
-                .frame(maxWidth: .infinity)
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 100, maxHeight: 100)
                 .clipped()
-                .cornerRadius(12)
+                .cornerRadius(10)
 
             // Info
             VStack(alignment: .leading, spacing: 3) {
@@ -558,10 +557,13 @@ struct FeaturedStoreCard: View {
                 Text(store.formattedDeliveryFee)
                     .font(.system(size: 12))
                     .foregroundColor(.grocartSecondary)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
         }
+        .padding(10)
+        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
         .background(Color.grocartBackground)
         .cornerRadius(14)
         .overlay(
@@ -576,23 +578,31 @@ struct FeaturedStoreCard: View {
             Image(assetName)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 100, maxHeight: 100)
+                .clipped()
         } else if let bannerUrl = store.bannerUrl ?? store.logoUrl, let url = URL(string: bannerUrl) {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image.resizable().aspectRatio(contentMode: .fill)
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 100, maxHeight: 100)
+                        .clipped()
                 default:
                     placeholderImage
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 100, maxHeight: 100)
         } else {
             placeholderImage
         }
     }
 
     private var placeholderImage: some View {
-        RoundedRectangle(cornerRadius: 12)
+        RoundedRectangle(cornerRadius: 10)
             .fill(Color.grocartGreen.opacity(0.12))
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 100, maxHeight: 100)
             .overlay(
                 Image(systemName: "storefront.fill")
                     .font(.system(size: 28))

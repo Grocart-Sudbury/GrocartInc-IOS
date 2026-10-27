@@ -69,6 +69,7 @@ struct StoreDetailView: View {
             if selectedCategoryId == nil { selectedCategoryId = viewModel.categories.first?.id }
         }
         .sheet(isPresented: $showCart) { CartView() }
+        .hideFloatingBottomBar()
     }
 
     // MARK: - Content

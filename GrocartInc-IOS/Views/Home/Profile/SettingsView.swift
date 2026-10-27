@@ -197,7 +197,9 @@ struct SettingsView: View {
                             .cornerRadius(12)
                         }
                         
-                        Text("GroCart v1.0.0 (Build 42)")
+                        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.15"
+                        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "15"
+                        Text("GroCart v\(version) (Build \(build))")
                             .font(.system(size: 11))
                             .foregroundColor(.grocartSecondary.opacity(0.6))
                     }

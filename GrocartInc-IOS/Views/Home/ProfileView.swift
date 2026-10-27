@@ -132,7 +132,7 @@ struct ProfileView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        Text("GroCart v1.9.0")
+                        Text("GroCart v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.15")")
                             .font(.system(size: 12))
                             .foregroundColor(.grocartSecondary)
                             .padding(.bottom, 20)

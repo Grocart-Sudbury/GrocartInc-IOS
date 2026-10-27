@@ -74,6 +74,7 @@ struct ProductDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             addToCartBar
         }
+        .hideFloatingBottomBar()
     }
 
     // MARK: - Hero Image
