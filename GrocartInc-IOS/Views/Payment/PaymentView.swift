@@ -76,9 +76,11 @@ struct PaymentView: View {
             logger.info("🔐 requiresAction onChange → \(val == nil ? "nil" : "SET")")
         }
         .sheet(isPresented: $showAddCard, onDismiss: {
-            logger.info("📋 AddCardView sheet dismissed")
+            logger.info("📋 PaymentSheet add-card sheet dismissed")
         }) {
-            AddCardView(viewModel: viewModel)
+            StandaloneAddCardView(setAsDefault: viewModel.savedCards.isEmpty) { newCard in
+                viewModel.loadCards(preserving: newCard)
+            }
         }
         .sheet(item: $viewModel.requiresAction, onDismiss: {
             logger.info("🔐 ThreeDSHandlerView sheet dismissed")
@@ -350,5 +352,19 @@ struct ThreeDSHandlerView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Auth Context for STPPaymentHandler (3DS & Setup Intent confirmation)
+
+/// Provides the top-most UIViewController to Stripe for presenting authentication screens.
+final class TopViewControllerAuthContext: NSObject, STPAuthenticationContext {
+    func authenticationPresentingViewController() -> UIViewController {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let root = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+        else { return UIViewController() }
+        var top = root
+        while let presented = top.presentedViewController { top = presented }
+        return top
     }
 }

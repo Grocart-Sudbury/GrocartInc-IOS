@@ -57,27 +57,6 @@ struct CheckoutView: View {
                     if let order = viewModel.pendingPaymentOrder {
                         PaymentView(order: order) { confirmedOrder in
                             logger.info("✅ PaymentView onPaymentSuccess — orderId=\(confirmedOrder.id)")
-                            // Record the sale in the on-device sales log.
-                            // This runs first, before settling points and
-                            // marking the scratch card used: those change
-                            // the points/scratch discounts to $0, and the
-                            // log must capture the amounts actually charged.
-                            if let logStore = viewModel.pendingLogStore {
-                                SalesLogManager.shared.recordOrder(
-                                    orderId: confirmedOrder.id,
-                                    trackingId: confirmedOrder.trackingId,
-                                    store: logStore,
-                                    items: viewModel.pendingLogItems,
-                                    orderType: viewModel.orderType.rawValue,
-                                    paymentMethod: viewModel.paymentMethod.rawValue,
-                                    subtotal: viewModel.pricing.subtotal,
-                                    tax: viewModel.pricing.tax,
-                                    deliveryCharge: viewModel.orderType == .delivery ? viewModel.effectiveShippingCost : 0,
-                                    tip: viewModel.orderType == .delivery ? viewModel.tipAmount : 0,
-                                    discount: viewModel.validatedDiscount + viewModel.pointsDiscount + viewModel.scratchCardDiscount,
-                                    total: viewModel.totalWithTip
-                                )
-                            }
                             // Settle rewards: take 500 points if redeemed,
                             // then award the points earned on this order's items.
                             PointsManager.shared.settleOrder(earnedPoints: viewModel.pendingEarnedPoints, redeemed: viewModel.usePointsReward, orderLabel: "Order \(confirmedOrder.trackingId)")
@@ -125,7 +104,7 @@ struct CheckoutView: View {
             Task { await viewModel.loadSavedCards() }
         }
         .sheet(isPresented: $showAddCard) {
-            StandaloneAddCardView(setAsDefault: viewModel.savedCards.isEmpty) {
+            StandaloneAddCardView(setAsDefault: viewModel.savedCards.isEmpty) { _ in
                 Task { await viewModel.loadSavedCards() }
             }
         }

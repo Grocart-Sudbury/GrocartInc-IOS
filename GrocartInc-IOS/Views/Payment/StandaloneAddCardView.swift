@@ -20,8 +20,9 @@ import StripePayments
 struct StandaloneAddCardView: View {
     /// True when this will be the account's first card (so it becomes the default).
     var setAsDefault: Bool = false
-    /// Called after the card is attached, so the caller can reload its list.
-    var onAdded: (() -> Void)? = nil
+    /// Called after the card is attached, passing the attached card so the
+    /// caller can reload its list and select the new card.
+    var onAdded: ((SavedCard) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -156,10 +157,10 @@ struct StandaloneAddCardView: View {
             return
         }
         do {
-            _ = try await PaymentRepository.shared.attachCard(
+            let savedCard = try await PaymentRepository.shared.attachCard(
                 AttachCardRequest(paymentMethodId: paymentMethodId, setAsDefault: setAsDefault)
             )
-            onAdded?()
+            onAdded?(savedCard)
             dismiss()
         } catch {
             localError = (error as? NetworkError)?.errorDescription ?? error.localizedDescription

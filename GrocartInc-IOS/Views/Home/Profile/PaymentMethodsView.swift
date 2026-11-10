@@ -170,7 +170,7 @@ struct PaymentMethodsView: View {
             await loadCards()
         }
         .sheet(isPresented: $showAddCard) {
-            StandaloneAddCardView(setAsDefault: cards.isEmpty) {
+            StandaloneAddCardView(setAsDefault: cards.isEmpty) { _ in
                 Task { await loadCards() }
             }
         }

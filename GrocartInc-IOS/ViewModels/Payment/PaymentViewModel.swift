@@ -62,6 +62,14 @@ final class PaymentViewModel: ObservableObject {
 
     // MARK: - Load Saved Cards
     func loadCards() {
+        loadCards(preserving: nil)
+    }
+
+    /// Reloads the saved cards. When `selection` is given and that card is in
+    /// the fetched list, it stays selected (used after adding a card so the
+    /// new card is selected even when it is not the default). Otherwise the
+    /// default card, or the first card, is selected as before.
+    func loadCards(preserving selection: SavedCard? = nil) {
         logger.info("▶️ loadCards() called")
         Task {
             isLoadingCards = true
@@ -70,8 +78,13 @@ final class PaymentViewModel: ObservableObject {
                 let cards = try await repository.getSavedCards()
                 logger.info("✅ loadCards() success — \(cards.count) card(s)")
                 savedCards = cards
-                selectedCard = savedCards.first(where: { $0.isDefault }) ?? savedCards.first
-                logger.info("💳 auto-selected card → \(self.selectedCard?.id ?? "none")")
+                if let selection = selection, let kept = savedCards.first(where: { $0.id == selection.id }) {
+                    selectedCard = kept
+                    logger.info("💳 kept selected card → \(self.selectedCard?.id ?? "none")")
+                } else {
+                    selectedCard = savedCards.first(where: { $0.isDefault }) ?? savedCards.first
+                    logger.info("💳 auto-selected card → \(self.selectedCard?.id ?? "none")")
+                }
             } catch let error as NetworkError {
                 logger.error("❌ loadCards() NetworkError: \(error.errorDescription ?? "unknown")")
                 errorMessage = error.errorDescription
@@ -106,37 +119,6 @@ final class PaymentViewModel: ObservableObject {
                 errorMessage = error.errorDescription
             } catch {
                 logger.error("❌ chargeCard() unknown error: \(error)")
-                errorMessage = "Payment failed. Please try again."
-            }
-            isProcessing = false
-        }
-    }
-
-    // MARK: - Attach New Card Then Charge
-    func attachAndCharge(paymentMethodId: String) {
-        logger.info("▶️ attachAndCharge() — orderId=\(self.order.id) pmId=\(paymentMethodId)")
-        isProcessing = true
-        errorMessage = nil
-
-        Task {
-            do {
-                logger.info("  → attaching card pmId=\(paymentMethodId)")
-                _ = try await repository.attachCard(AttachCardRequest(
-                    paymentMethodId: paymentMethodId,
-                    setAsDefault: savedCards.isEmpty
-                ))
-                logger.info("  → attach success, charging order \(self.order.id)")
-                let chargeResponse = try await repository.chargeCard(ChargeRequest(
-                    orderId: order.id,
-                    paymentMethodId: paymentMethodId
-                ))
-                logger.info("✅ attachAndCharge() charge response — success=\(chargeResponse.success) requiresAction=\(chargeResponse.requiresAction.map(String.init) ?? "nil")")
-                handleChargeResponse(chargeResponse)
-            } catch let error as NetworkError {
-                logger.error("❌ attachAndCharge() NetworkError: \(error.errorDescription ?? "unknown")")
-                errorMessage = error.errorDescription
-            } catch {
-                logger.error("❌ attachAndCharge() unknown error: \(error)")
                 errorMessage = "Payment failed. Please try again."
             }
             isProcessing = false

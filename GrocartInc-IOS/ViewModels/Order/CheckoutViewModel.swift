@@ -116,15 +116,6 @@ final class CheckoutViewModel: ObservableObject {
     /// succeeds.
     var pendingEarnedPoints: Int = 0
 
-    // MARK: - Sales Log
-    /// The cart items and store for the order being placed, captured
-    /// when the order is placed (like pendingEarnedPoints) because the
-    /// cart is cleared right after. Used to record the sale in the
-    /// on-device sales log once the order succeeds — in the cash branch
-    /// here, and in CheckoutView's PaymentView onPaymentSuccess for card.
-    var pendingLogItems: [CartItem] = []
-    var pendingLogStore: Store? = nil
-
     // MARK: - Scratch Card
     /// The scratch card the customer chose to apply to this order.
     @Published var selectedScratchCard: ScratchCard? = nil
@@ -406,11 +397,6 @@ final class CheckoutViewModel: ObservableObject {
             total + PointsManager.points(forPrice: item.product.displayPrice, quantity: item.count)
         }
 
-        // The items and store for the sales log. Captured now for the
-        // same reason — the cart is cleared once the order is placed.
-        pendingLogItems = cartManager.items
-        pendingLogStore = store
-
         let orderItems = cartManager.items.map { item in
             OrderRequest.OrderItemRequest(
                 productId: item.product.id,
@@ -502,26 +488,6 @@ final class CheckoutViewModel: ObservableObject {
                     // Cash (pickup only): there is no card payment to take,
                     // so the order is placed — settle rewards and show the
                     // confirmation straight away instead of the card screen.
-                    // Record the sale FIRST, before settling points and
-                    // marking the scratch card used: those change the
-                    // points/scratch discounts to $0, and the log must
-                    // capture the amounts actually charged.
-                    if let logStore = pendingLogStore {
-                        SalesLogManager.shared.recordOrder(
-                            orderId: result.id,
-                            trackingId: result.trackingId,
-                            store: logStore,
-                            items: pendingLogItems,
-                            orderType: orderType.rawValue,
-                            paymentMethod: paymentMethod.rawValue,
-                            subtotal: pricing.subtotal,
-                            tax: pricing.tax,
-                            deliveryCharge: orderType == .delivery ? effectiveShippingCost : 0,
-                            tip: orderType == .delivery ? tipAmount : 0,
-                            discount: validatedDiscount + pointsDiscount + scratchCardDiscount,
-                            total: totalWithTip
-                        )
-                    }
                     PointsManager.shared.settleOrder(earnedPoints: pendingEarnedPoints, redeemed: usePointsReward, orderLabel: "Order \(result.trackingId)")
                     if let usedCard = selectedScratchCard {
                         ScratchCardManager.shared.markUsed(usedCard)

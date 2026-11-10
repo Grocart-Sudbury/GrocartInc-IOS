@@ -22,7 +22,6 @@ struct ProfileView: View {
 
     private let menuItems: [(String, String, Color, AnyView)] = [
         ("bag.fill",         "My Orders",           .grocartGreen,                    AnyView(MyOrdersView())),
-        ("chart.bar.fill",   "Sales Report",        Color(red: 0.35, green: 0.45, blue: 0.6), AnyView(SalesReportView())),
         ("repeat.circle.fill","Subscriptions",        .purple,                          AnyView(SubscriptionListView())),
         ("mappin.circle.fill","Delivery Addresses",  Color(red: 0.2, green: 0.6, blue: 0.9), AnyView(DeliveryAddressesView())),
         ("creditcard.fill",  "Cards",                Color(red: 0.15, green: 0.35, blue: 0.75), AnyView(PaymentMethodsView())),
