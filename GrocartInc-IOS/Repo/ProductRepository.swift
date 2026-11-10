@@ -23,6 +23,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "ProductR
 final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
     
     static let shared = ProductRepository()
+    private static let decoder = JSONDecoder()
 
     private let cache = CacheManager.shared
     private let cacheKey = "categories"
@@ -84,7 +85,7 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW RESPONSE: \(raw.prefix(500))")
             do {
-                return try JSONDecoder().decode([Category].self, from: data)
+                return try Self.decoder.decode([Category].self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)
@@ -124,7 +125,7 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
             let rawJSON = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW RESPONSE: \(rawJSON.prefix(500))")
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try Self.decoder.decode(T.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)
@@ -164,7 +165,7 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
             logger.debug("RAW RESPONSE: \(rawJSON.prefix(500))")
             
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try Self.decoder.decode(T.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)
@@ -182,7 +183,7 @@ final class ProductRepository: @unchecked Sendable, ProductRepositoryProtocol {
     // MARK: - Error Mapping
     private func mapError(_ afError: AFError, data: Data?, statusCode: Int?) -> NetworkError {
         if let data = data,
-           let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+           let errorResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
             if statusCode == 401 { return .unauthorized }
             return .serverError(errorResponse.displayMessage)
         }

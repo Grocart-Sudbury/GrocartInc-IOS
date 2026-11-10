@@ -10,6 +10,7 @@ import Combine
 import CoreLocation
 
 // MARK: - Observable state (no NSObject inheritance — works with MainActor isolation)
+@MainActor
 final class LocationState: ObservableObject {
     static let shared = LocationState()
 
@@ -24,6 +25,7 @@ final class LocationState: ObservableObject {
 }
 
 // MARK: - CLLocation wrapper (NSObject, not ObservableObject)
+@MainActor
 final class LocationManager: NSObject {
 
     static let shared = LocationManager()
@@ -49,27 +51,23 @@ final class LocationManager: NSObject {
         case .notDetermined:
             clManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
-            print("[LocationManager] Requesting fresh location")
             clManager.requestLocation()
         case .denied, .restricted:
-            DispatchQueue.main.async { self.state.cityName = "Location Off" }
+            state.cityName = "Location Off"
         @unknown default:
             break
         }
     }
 
     func resetAndRequestLocation() {
-        print("[LocationManager] Cache cleared — requesting fresh location")
         requestLocationIfNeeded()
     }
 
     private func reverseGeocode(_ location: CLLocation) {
-        print("[LocationManager] Reverse geocoding location: \(location.coordinate)")
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             guard let self else { return }
             let city = placemarks?.first?.locality ?? "Unknown Location"
-            print("[LocationManager] Geocode result: \(city)")
-            DispatchQueue.main.async { self.state.cityName = city }
+            Task { @MainActor in self.state.cityName = city }
         }
     }
 }
@@ -80,10 +78,9 @@ extension LocationManager: CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
-            print("[LocationManager] Requesting fresh location")
             manager.requestLocation()
         case .denied, .restricted:
-            DispatchQueue.main.async { self.state.cityName = "Location Off" }
+            state.cityName = "Location Off"
         default:
             break
         }
@@ -95,10 +92,8 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        DispatchQueue.main.async {
-            if self.state.cityName == "Locating..." {
-                self.state.cityName = "Location Off"
-            }
+        if state.cityName == "Locating..." {
+            state.cityName = "Location Off"
         }
     }
 }

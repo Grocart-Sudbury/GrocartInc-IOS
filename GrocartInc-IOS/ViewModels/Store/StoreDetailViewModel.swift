@@ -30,6 +30,12 @@ final class StoreDetailViewModel: ObservableObject {
         Task {
             do {
                 categories = try await repository.fetchCategories(storeId: store.id)
+                // New products and price/discount changes show as notifications.
+                NotificationManager.shared.checkProducts(
+                    categories.flatMap { category in
+                        category.products.map { (product: $0, store: store, categoryName: category.name) }
+                    }
+                )
             } catch let error as NetworkError {
                 errorMessage = error.errorDescription
             } catch {

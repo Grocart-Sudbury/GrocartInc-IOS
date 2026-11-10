@@ -25,7 +25,8 @@ final class CacheManager: @unchecked Sendable {
     private let cacheDirectory: URL
     
     private init() {
-        let documentsDir = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let documentsDir = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
         cacheDirectory = documentsDir.appendingPathComponent("grocart_cache", isDirectory: true)
         
         // Create cache directory if needed

@@ -14,6 +14,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "HomeRepo
 final class HomeRepository: @unchecked Sendable {
 
     static let shared = HomeRepository()
+    private static let decoder = JSONDecoder()
 
     private init() {}
 
@@ -54,7 +55,7 @@ final class HomeRepository: @unchecked Sendable {
             let rawJSON = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW RESPONSE: \(rawJSON.prefix(500))")
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try Self.decoder.decode(T.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)
@@ -71,7 +72,7 @@ final class HomeRepository: @unchecked Sendable {
     // MARK: - Error Mapping
     private func mapError(_ afError: AFError, data: Data?, statusCode: Int?) -> NetworkError {
         if let data = data,
-           let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+           let errorResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
             if statusCode == 401 { return .unauthorized }
             return .serverError(errorResponse.displayMessage)
         }

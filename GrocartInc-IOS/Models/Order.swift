@@ -8,7 +8,7 @@
 import Foundation
 
 // MARK: - Order Type
-enum OrderType: String, CaseIterable {
+enum OrderType: String, CaseIterable, Codable {
     case delivery = "DELIVERY"
     case pickup   = "PICKUP"
 
@@ -187,6 +187,15 @@ struct OrderResponse: Decodable {
     var isPickup: Bool { orderType == OrderType.pickup.rawValue }
 
     var formattedTotal: String { String(format: "$%.2f", total) }
+
+    /// Friendly payment label for the confirmation screen.
+    var paymentMethodDisplay: String {
+        switch paymentMethod.uppercased() {
+        case "CASH": return "Cash on Pickup"
+        case "STRIPE": return "Credit / Debit Card"
+        default: return paymentMethod
+        }
+    }
 
     var deliverySlotDisplay: String {
         guard let slot = preferredDeliveryTimeSlot else { return "" }

@@ -51,6 +51,17 @@ enum ActiveOrderStatus: String, Decodable {
         }
     }
 
+    /// The canonical stage used for notification change detection.
+    var orderStage: OrderStage {
+        switch self {
+        case .confirmed: return .placed
+        case .processing, .assigned, .enRouteToStore: return .processing
+        case .readyForPickup: return .readyForPickup
+        case .pickedUp, .enRouteToCustomer: return .inTransit
+        case .cancelled: return .cancelled
+        }
+    }
+
     // 0-based step index; -1 for cancelled
     func progressStep(isPickup: Bool) -> Int {
         switch self {

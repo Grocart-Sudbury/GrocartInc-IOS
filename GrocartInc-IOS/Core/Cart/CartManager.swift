@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class CartManager: ObservableObject {
 
     static let shared = CartManager()

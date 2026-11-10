@@ -14,6 +14,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "StoreRep
 final class StoreRepository: @unchecked Sendable {
 
     static let shared = StoreRepository()
+    private static let decoder = JSONDecoder()
 
     // Public endpoint — no auth interceptor needed
     private let session: Session = {
@@ -61,7 +62,9 @@ final class StoreRepository: @unchecked Sendable {
             logger.info("STATUS CODE: \(response.response?.statusCode ?? -1)")
             logger.info("RAW RESPONSE: \(raw.prefix(500))")
             do {
-                let stores = try JSONDecoder().decode([Store].self, from: data)
+                // Decode stores one by one: a single malformed store is
+                // skipped instead of failing the whole list.
+                let stores = try Self.decoder.decode([FailableDecodable<Store>].self, from: data).compactMap(\.value)
                 cache.save(stores, forKey: key)
                 return stores
             } catch {
@@ -98,7 +101,7 @@ final class StoreRepository: @unchecked Sendable {
         switch response.result {
         case .success(let data):
             do {
-                return try JSONDecoder().decode(DeliverySchedule.self, from: data)
+                return try Self.decoder.decode(DeliverySchedule.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)

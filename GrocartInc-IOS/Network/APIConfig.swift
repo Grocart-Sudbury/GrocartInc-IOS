@@ -60,6 +60,11 @@ struct APIConfig {
         static let active = "\(baseURL)/customer/orders/active"
     }
 
+    struct Subscriptions {
+        static let base = "\(baseURL)/customer/subscriptions"
+        static func byId(_ id: Int) -> String { "\(base)/\(id)" }
+    }
+
     struct Products {
         static let categories = "\(baseURL)/categories"
     }
@@ -104,7 +109,6 @@ struct APIConfig {
     }
 
     // MARK: - Stripe
-    // TODO: Replace with your actual Stripe publishable key from the Stripe Dashboard
     static let stripePublishableKey = "pk_live_51SLbLoBz4P6OLwsVYvrJhUb1KonoFVDivJjyIfLmiw3WgNZGYOqPXH8rFCpseI0hAjCEdEoIlOGC6XWrx0YdI51W00XTseX3jc"
 
     // MARK: - Timeouts

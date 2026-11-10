@@ -14,6 +14,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "AuthRepo
 final class AuthRepository: @unchecked Sendable, AuthRepositoryProtocol {
     
     static let shared = AuthRepository()
+    private static let decoder = JSONDecoder()
     
     private let session: Session
     
@@ -104,7 +105,7 @@ final class AuthRepository: @unchecked Sendable, AuthRepositoryProtocol {
             logger.info("RAW RESPONSE: \(rawJSON)")
             
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try Self.decoder.decode(T.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)
@@ -126,7 +127,7 @@ final class AuthRepository: @unchecked Sendable, AuthRepositoryProtocol {
     private func mapError(_ afError: AFError, data: Data?, statusCode: Int?) -> NetworkError {
         // Try JSON error response first
         if let data = data,
-           let errorResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+           let errorResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
             return .serverError(errorResponse.displayMessage)
         }
 

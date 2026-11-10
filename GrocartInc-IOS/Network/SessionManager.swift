@@ -131,7 +131,7 @@ final class SessionManager: ObservableObject {
     private func resetLocationCache() {
         UserDefaults.standard.removeObject(forKey: "grocart.selectedCity")
         CacheManager.shared.clearAll()
-        DispatchQueue.main.async {
+        Task { @MainActor in
             LocationState.shared.cityName = "Locating..."
         }
     }

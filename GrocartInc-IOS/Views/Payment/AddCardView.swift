@@ -163,8 +163,8 @@ struct AddCardView: View {
 
                 await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                     STPPaymentHandler.shared().confirmSetupIntent(
-                        confirmParams,
-                        with: TopViewControllerAuthContext()
+                        params: confirmParams,
+                        authenticationContext: TopViewControllerAuthContext()
                     ) { status, setupIntentResult, error in
                         Task { @MainActor in
                             switch status {

@@ -9,7 +9,24 @@ import SwiftUI
 
 struct OrderConfirmationView: View {
     let order: OrderResponse
+    let pointsEarned: Int
+    let scratchCard: ScratchCard?
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var scratchCardManager = ScratchCardManager.shared
+    @State private var showScratchCard = false
+
+    init(order: OrderResponse, pointsEarned: Int = 0, scratchCard: ScratchCard? = nil) {
+        self.order = order
+        self.pointsEarned = pointsEarned
+        self.scratchCard = scratchCard
+    }
+
+    /// The earned card as it stands now in the manager (so the row
+    /// updates to the revealed prize after the user scratches it).
+    private var liveScratchCard: ScratchCard? {
+        guard let card = scratchCard else { return nil }
+        return scratchCardManager.cards.first(where: { $0.id == card.id }) ?? card
+    }
 
     var body: some View {
         ZStack {
@@ -108,17 +125,62 @@ struct OrderConfirmationView: View {
                         }
                         detailRow(icon: "creditcard.fill",
                                   label: "Payment",
-                                  value: order.paymentMethod)
+                                  value: order.paymentMethodDisplay)
                         Divider().padding(.horizontal, 16)
                         detailRow(icon: "cart.fill",
                                   label: "Total charged",
                                   value: order.formattedTotal,
+                                  valueColor: .grocartGreen)
+                        Divider().padding(.horizontal, 16)
+                        detailRow(icon: "star.fill",
+                                  label: "Points earned",
+                                  value: "+\(pointsEarned) pts",
                                   valueColor: .grocartGreen)
                     }
                     .background(Color.grocartSecondaryBackground.opacity(0.6))
                     .cornerRadius(16)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 20)
+
+                    // Scratch card earned from this order
+                    if let card = liveScratchCard {
+                        Button(action: { showScratchCard = true }) {
+                            HStack(spacing: 14) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: card.gradientColors,
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 48, height: 48)
+                                    Image(systemName: card.isScratched ? "checkmark" : "sparkles")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("You earned a scratch card!")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(.grocartPrimary)
+                                    Text(card.isScratched ? card.displayDiscount : "Tap to scratch & reveal your gift")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.grocartSecondary)
+                                }
+                                Spacer()
+                                Image(systemName: "hand.draw.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(16)
+                            .background(Color.grocartSecondaryBackground)
+                            .cornerRadius(16)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 20)
+                    }
 
                     // Status badge
                     HStack(spacing: 8) {
@@ -151,6 +213,16 @@ struct OrderConfirmationView: View {
                     .padding(.horizontal, 16)
                     .padding(.bottom, 40)
                 }
+            }
+
+            if showScratchCard, let card = liveScratchCard {
+                LocalScratchCardOverlay(
+                    card: card,
+                    onDismiss: { showScratchCard = false },
+                    onScratched: { ScratchCardManager.shared.markScratched(card) }
+                )
+                .transition(.opacity)
+                .zIndex(1)
             }
         }
     }
@@ -190,4 +262,6 @@ extension OrderResponse: Identifiable {}
 
 extension Notification.Name {
     static let navigateToHome = Notification.Name("com.grocartinc.navigateToHome")
+    static let navigateToCart = Notification.Name("com.grocartinc.navigateToCart")
+    static let dismissProductDetail = Notification.Name("com.grocartinc.dismissProductDetail")
 }

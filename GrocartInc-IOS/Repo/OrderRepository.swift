@@ -14,6 +14,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "OrderRep
 final class OrderRepository: @unchecked Sendable {
 
     static let shared = OrderRepository()
+    private static let decoder = JSONDecoder()
 
     // Public endpoint — no auth interceptor needed for top-products
     private let publicSession: Session = {
@@ -43,7 +44,7 @@ final class OrderRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("ACTIVE ORDERS RAW: \(raw.prefix(500))")
             do {
-                let orders = try JSONDecoder().decode([ActiveOrder].self, from: data)
+                let orders = try Self.decoder.decode([ActiveOrder].self, from: data)
                 logger.info("ACTIVE ORDERS SUCCESS: \(orders.count) order(s) returned")
                 return orders
             } catch {
@@ -78,7 +79,7 @@ final class OrderRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.info("TOP PRODUCTS RESPONSE BODY: \(raw, privacy: .public)")
             do {
-                let products = try JSONDecoder().decode([TopOrderedProduct].self, from: data)
+                let products = try Self.decoder.decode([TopOrderedProduct].self, from: data)
                 logger.info("TOP PRODUCTS SUCCESS: \(products.count) product(s) returned")
                 return products
             } catch {
@@ -120,7 +121,7 @@ final class OrderRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW RESPONSE: \(raw.prefix(500))")
             do {
-                return try JSONDecoder().decode(OrderResponse.self, from: data)
+                return try Self.decoder.decode(OrderResponse.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)
@@ -129,7 +130,7 @@ final class OrderRepository: @unchecked Sendable {
             let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
             logger.error("FAILED: \(body)")
             if let data = response.data,
-               let errResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+               let errResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
                 throw NetworkError.serverError(errResponse.displayMessage)
             }
             if response.response?.statusCode == 401 { throw NetworkError.unauthorized }

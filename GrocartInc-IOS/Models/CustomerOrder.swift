@@ -30,6 +30,17 @@ enum CustomerOrderStatus: String, Decodable {
         }
     }
 
+    /// The canonical stage used for notification change detection.
+    var orderStage: OrderStage {
+        switch self {
+        case .pending, .confirmed: return .placed
+        case .processing: return .processing
+        case .inTransit: return .inTransit
+        case .delivered: return .delivered
+        case .cancelled: return .cancelled
+        }
+    }
+
     var color: Color {
         switch self {
         case .pending:    return .orange

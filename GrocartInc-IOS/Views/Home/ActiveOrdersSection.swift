@@ -23,6 +23,11 @@ final class ActiveOrdersViewModel: ObservableObject {
         defer { isLoading = false }
         do {
             orders = try await repo.fetchActiveOrders()
+            // Order status changes (placed, processing, in transit,
+            // delivered, cancelled) show as notifications.
+            NotificationManager.shared.checkOrders(orders.map {
+                (id: $0.id, trackingId: $0.trackingId, stage: $0.status.orderStage)
+            })
         } catch {
             orders = []
         }

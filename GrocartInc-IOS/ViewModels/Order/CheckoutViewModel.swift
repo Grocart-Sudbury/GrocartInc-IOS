@@ -8,11 +8,49 @@
 import Foundation
 import Combine
 
+// MARK: - Checkout Payment Method
+enum CheckoutPaymentMethod: String, CaseIterable {
+    case card = "STRIPE"
+    case cash = "CASH"
+
+    var displayName: String {
+        switch self {
+        case .card: return "Credit / Debit Card"
+        case .cash: return "Pay by Cash"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .card: return "creditcard.fill"
+        case .cash: return "banknote.fill"
+        }
+    }
+}
+
 @MainActor
 final class CheckoutViewModel: ObservableObject {
 
+    // MARK: - Shared Date Formatters
+    /// DateFormatter creation is expensive; these are created once and
+    /// reused for every slot fetch and order placement. They are only
+    /// touched from this @MainActor view model.
+    private static let orderDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return formatter
+    }()
+
     // MARK: - Order Type
-    @Published var orderType: OrderType = .delivery
+    @Published var orderType: OrderType = .delivery {
+        didSet { refreshDeliveryFee() }
+    }
 
     // MARK: - Selected Address
     @Published var selectedAddress: CustomerAddress? = nil {
@@ -48,7 +86,50 @@ final class CheckoutViewModel: ObservableObject {
 
     // MARK: - Tip & Payment
     @Published var tipAmount: Double = 0
-    @Published var paymentMethod: String = "STRIPE"
+    /// How this order is paid. Card is "STRIPE"; cash is "CASH" and is
+    /// only offered for pickup orders (pay at the store).
+    @Published var paymentMethod: CheckoutPaymentMethod = .card
+
+    // MARK: - Saved Cards (Stripe)
+    /// The customer's saved cards, loaded from the backend. Shown under
+    /// the card payment option so the customer can see which card will
+    /// be charged and add a new one (through Stripe) before placing
+    /// the order.
+    @Published var savedCards: [SavedCard] = []
+    @Published var isLoadingCards = false
+
+    func loadSavedCards() async {
+        isLoadingCards = true
+        do {
+            savedCards = try await PaymentRepository.shared.getSavedCards()
+        } catch {
+            savedCards = []
+        }
+        isLoadingCards = false
+    }
+
+    // MARK: - Rewards Points
+    @Published var usePointsReward = false
+    /// Points this order will earn, from the items (each item's price
+    /// rounded to the nearest $1, x quantity). Computed when the order is
+    /// placed, before the cart is cleared; awarded only if the payment
+    /// succeeds.
+    var pendingEarnedPoints: Int = 0
+
+    // MARK: - Sales Log
+    /// The cart items and store for the order being placed, captured
+    /// when the order is placed (like pendingEarnedPoints) because the
+    /// cart is cleared right after. Used to record the sale in the
+    /// on-device sales log once the order succeeds — in the cash branch
+    /// here, and in CheckoutView's PaymentView onPaymentSuccess for card.
+    var pendingLogItems: [CartItem] = []
+    var pendingLogStore: Store? = nil
+
+    // MARK: - Scratch Card
+    /// The scratch card the customer chose to apply to this order.
+    @Published var selectedScratchCard: ScratchCard? = nil
+    /// The scratch card earned from this order, shown on the confirmation.
+    @Published var earnedScratchCard: ScratchCard? = nil
 
     // MARK: - State
     @Published var isPlacingOrder = false
@@ -69,14 +150,99 @@ final class CheckoutViewModel: ObservableObject {
     private let repository = OrderRepository.shared
     private let addressRepo = AddressRepository.shared
 
+    // MARK: - Distance-Based Delivery Fee
+    /// The distance from the store to the selected delivery address, and
+    /// the fee for it, once the address has been geocoded. Nil until then
+    /// (or when the address can't be geocoded), in which case the backend's
+    /// flat shipping cost is used instead.
+    @Published var deliveryDistanceKm: Double? = nil
+    @Published var distanceBasedFee: Double? = nil
+
+    /// The delivery fee actually charged for this order. For delivery it is
+    /// the distance-based fee when the address has been geocoded, otherwise
+    /// the backend's flat shipping cost. Pickup has no delivery fee.
+    var effectiveShippingCost: Double {
+        if orderType == .pickup { return 0 }
+        return distanceBasedFee ?? pricing.shippingCost
+    }
+
+    var formattedEffectiveShipping: String {
+        effectiveShippingCost == 0 ? "Free" : String(format: "$%.2f", effectiveShippingCost)
+    }
+
+    /// "Delivery (5.3 km)" once the distance is known, otherwise "Delivery".
+    var deliveryFeeLabel: String {
+        if let distance = deliveryDistanceKm {
+            return "Delivery (\(DeliveryFeeCalculator.formattedDistance(distance)))"
+        }
+        return "Delivery"
+    }
+
+    /// The backend's order total with its flat shipping cost swapped for the
+    /// distance-based fee, so the total, the discounts and the order itself
+    /// all agree on the fee the customer actually pays.
+    var effectiveDeliveryTotal: Double {
+        pricing.total - pricing.shippingCost + effectiveShippingCost
+    }
+
+    /// Work out the distance-based delivery fee for the selected address.
+    /// Runs whenever the address or the order type changes; until it
+    /// resolves (or when the address can't be geocoded) the backend's
+    /// flat shipping cost applies.
+    func refreshDeliveryFee() {
+        guard orderType == .delivery,
+              let address = selectedAddress,
+              let store = cartManager.store else {
+            deliveryDistanceKm = nil
+            distanceBasedFee = nil
+            return
+        }
+        Task {
+            if let result = await DeliveryFeeCalculator.fee(from: store, to: address) {
+                deliveryDistanceKm = result.distanceKm
+                distanceBasedFee = result.fee
+            } else {
+                deliveryDistanceKm = nil
+                distanceBasedFee = nil
+            }
+        }
+    }
+
     // MARK: - Computed
+    /// $5 off when the customer redeems 500 points. Capped so the total
+    /// never goes below $0.
+    var pointsDiscount: Double {
+        guard usePointsReward && PointsManager.shared.canRedeem else { return 0 }
+        let base: Double
+        if orderType == .pickup {
+            base = pricing.subtotal + pricing.tax - validatedDiscount
+        } else {
+            base = effectiveDeliveryTotal - validatedDiscount + tipAmount
+        }
+        return min(PointsManager.redeemValue, max(0, base))
+    }
+
     var totalWithTip: Double {
         if orderType == .pickup {
-            return pricing.subtotal + pricing.tax - validatedDiscount
+            return pricing.subtotal + pricing.tax - validatedDiscount - pointsDiscount - scratchCardDiscount
         }
-        return pricing.total - validatedDiscount + tipAmount
+        return effectiveDeliveryTotal - validatedDiscount - pointsDiscount - scratchCardDiscount + tipAmount
     }
     var formattedTotal: String { String(format: "$%.2f", totalWithTip) }
+
+    /// The discount from the scratch card applied to this order.
+    /// Capped so the total never goes below $0.
+    var scratchCardDiscount: Double {
+        guard let card = selectedScratchCard, card.isUsable else { return 0 }
+        let raw = ScratchCardManager.discount(for: card, subtotal: pricing.subtotal)
+        let base: Double
+        if orderType == .pickup {
+            base = pricing.subtotal + pricing.tax - validatedDiscount - pointsDiscount
+        } else {
+            base = effectiveDeliveryTotal - validatedDiscount - pointsDiscount + tipAmount
+        }
+        return min(raw, max(0, base))
+    }
 
     var availableDates: [Date] {
         (0..<7).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: Date()) }
@@ -125,6 +291,7 @@ final class CheckoutViewModel: ObservableObject {
         if email.isEmpty {
             email = SessionManager.shared.currentUser?.email ?? ""
         }
+        refreshDeliveryFee()
     }
 
     private func loadDefaultAddress() {
@@ -158,9 +325,7 @@ final class CheckoutViewModel: ObservableObject {
     // MARK: - Delivery Slots
     func fetchSlotsForSelectedDate() async {
         guard let storeId = cartManager.store?.id else { return }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE"
-        let dayOfWeek = formatter.string(from: selectedDate).uppercased()
+        let dayOfWeek = Self.weekdayFormatter.string(from: selectedDate).uppercased()
 
         isLoadingSlots = true
         defer { isLoadingSlots = false }
@@ -234,6 +399,18 @@ final class CheckoutViewModel: ObservableObject {
         errorMessage = nil
         isPlacingOrder = true
 
+        // Points for this order, from the items (price rounded to the
+        // nearest $1, x quantity). Captured now — the cart is cleared
+        // once the order is placed, so it can't be recomputed later.
+        pendingEarnedPoints = cartManager.items.reduce(0) { total, item in
+            total + PointsManager.points(forPrice: item.product.displayPrice, quantity: item.count)
+        }
+
+        // The items and store for the sales log. Captured now for the
+        // same reason — the cart is cleared once the order is placed.
+        pendingLogItems = cartManager.items
+        pendingLogStore = store
+
         let orderItems = cartManager.items.map { item in
             OrderRequest.OrderItemRequest(
                 productId: item.product.id,
@@ -252,9 +429,7 @@ final class CheckoutViewModel: ObservableObject {
                 isPlacingOrder = false
                 return
             }
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            let deliveryDate = dateFormatter.string(from: selectedDate)
+            let deliveryDate = Self.orderDateFormatter.string(from: selectedDate)
             let cityDisplay = city.isEmpty ? LocationState.shared.cityName : city
 
             request = OrderRequest(
@@ -275,20 +450,18 @@ final class CheckoutViewModel: ObservableObject {
                 preferredPickupTimeSlot: nil,
                 subtotal: pricing.subtotal,
                 tax: pricing.tax,
-                shippingCost: pricing.shippingCost,
+                shippingCost: effectiveShippingCost,
                 serviceFee: pricing.serviceFee,
-                discount: validatedDiscount,
+                discount: validatedDiscount + pointsDiscount + scratchCardDiscount,
                 tipAmount: tipAmount,
                 total: totalWithTip,
                 couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
-                paymentMethod: paymentMethod,
+                paymentMethod: paymentMethod.rawValue,
                 bundleIds: [],
                 items: orderItems
             )
         } else {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            let pickupDate = dateFormatter.string(from: selectedPickupDate)
+            let pickupDate = Self.orderDateFormatter.string(from: selectedPickupDate)
 
             request = OrderRequest(
                 orderType: OrderType.pickup.rawValue,
@@ -310,11 +483,11 @@ final class CheckoutViewModel: ObservableObject {
                 tax: pricing.tax,
                 shippingCost: 0,
                 serviceFee: 0,
-                discount: validatedDiscount,
+                discount: validatedDiscount + pointsDiscount + scratchCardDiscount,
                 tipAmount: 0,
-                total: pricing.subtotal + pricing.tax - validatedDiscount,
+                total: totalWithTip,
                 couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
-                paymentMethod: paymentMethod,
+                paymentMethod: paymentMethod.rawValue,
                 bundleIds: [],
                 items: orderItems
             )
@@ -325,7 +498,39 @@ final class CheckoutViewModel: ObservableObject {
                 let result = try await repository.placeOrder(request)
                 cartManager.clear()
                 isPlacingOrder = false
-                pendingPaymentOrder = result
+                if paymentMethod == .cash {
+                    // Cash (pickup only): there is no card payment to take,
+                    // so the order is placed — settle rewards and show the
+                    // confirmation straight away instead of the card screen.
+                    // Record the sale FIRST, before settling points and
+                    // marking the scratch card used: those change the
+                    // points/scratch discounts to $0, and the log must
+                    // capture the amounts actually charged.
+                    if let logStore = pendingLogStore {
+                        SalesLogManager.shared.recordOrder(
+                            orderId: result.id,
+                            trackingId: result.trackingId,
+                            store: logStore,
+                            items: pendingLogItems,
+                            orderType: orderType.rawValue,
+                            paymentMethod: paymentMethod.rawValue,
+                            subtotal: pricing.subtotal,
+                            tax: pricing.tax,
+                            deliveryCharge: orderType == .delivery ? effectiveShippingCost : 0,
+                            tip: orderType == .delivery ? tipAmount : 0,
+                            discount: validatedDiscount + pointsDiscount + scratchCardDiscount,
+                            total: totalWithTip
+                        )
+                    }
+                    PointsManager.shared.settleOrder(earnedPoints: pendingEarnedPoints, redeemed: usePointsReward, orderLabel: "Order \(result.trackingId)")
+                    if let usedCard = selectedScratchCard {
+                        ScratchCardManager.shared.markUsed(usedCard)
+                    }
+                    earnedScratchCard = ScratchCardManager.shared.generateAfterOrder(orderLabel: "Order \(result.trackingId)")
+                    placedOrder = result
+                } else {
+                    pendingPaymentOrder = result
+                }
             } catch let error as NetworkError {
                 errorMessage = error.errorDescription
                 isPlacingOrder = false

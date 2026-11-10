@@ -81,6 +81,19 @@ struct AddressFormView: View {
         !address.isEmpty && !city.isEmpty && !postalCode.isEmpty
     }
 
+    /// The required fields still empty, so the form can say what's
+    /// blocking Save instead of just greying the button out.
+    private var missingFields: [String] {
+        var missing: [String] = []
+        if firstName.isEmpty { missing.append("First name") }
+        if lastName.isEmpty { missing.append("Last name") }
+        if phone.isEmpty { missing.append("Phone number") }
+        if address.isEmpty { missing.append("Street address") }
+        if city.isEmpty { missing.append("City") }
+        if postalCode.isEmpty { missing.append("Postal code") }
+        return missing
+    }
+
     init(editingAddress: CustomerAddress? = nil, onSave: @escaping (AddressRequest) async throws -> Void) {
         self.editingAddress = editingAddress
         self.onSave = onSave
@@ -104,6 +117,12 @@ struct AddressFormView: View {
                             Text(error)
                                 .font(.system(size: 13))
                                 .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                        }
+                        if !isFormValid {
+                            Text("Still needed: \(missingFields.joined(separator: ", "))")
+                                .font(.system(size: 13))
+                                .foregroundColor(.orange)
                                 .multilineTextAlignment(.center)
                         }
                         saveButton

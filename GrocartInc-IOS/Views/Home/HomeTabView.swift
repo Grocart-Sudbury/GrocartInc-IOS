@@ -10,15 +10,16 @@ import SwiftUI
 struct HomeTabView: View {
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject private var locationState = LocationState.shared
+    @ObservedObject private var pointsManager = PointsManager.shared
+    @ObservedObject private var notificationManager = NotificationManager.shared
     @State private var showCityPicker = false
     @State private var showNotifications = false
     @State private var showProfile = false
+    @State private var showPoints = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color.grocartBackground.ignoresSafeArea()
-                
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 24) {
                         // Header
@@ -43,6 +44,7 @@ struct HomeTabView: View {
                     await viewModel.refresh()
                 }
             }
+            .clearGlassBackground()
             .navigationBarHidden(true)
         }
         .onAppear {
@@ -53,13 +55,10 @@ struct HomeTabView: View {
                 showCityPicker = true
             }
         }
-        .confirmationDialog("Choose Your City", isPresented: $showCityPicker, titleVisibility: .visible) {
-            ForEach(City.allCases, id: \.self) { city in
-                Button(city.displayName) { locationState.cityName = city.displayName }
+        .overlay {
+            if showCityPicker {
+                CityPickerSheet(isPresented: $showCityPicker)
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Location access is off. Select your delivery city.")
         }
     }
     
@@ -67,26 +66,31 @@ struct HomeTabView: View {
     private var headerSection: some View {
         VStack(spacing: 14) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Deliver to")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.grocartSecondary)
-                    
-                    Button(action: { showCityPicker = true }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "mappin.circle.fill")
-                                .foregroundColor(.grocartGreen)
-                                .font(.system(size: 14))
-                            Text(locationState.cityName)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(.grocartPrimary)
-                                .redacted(reason: locationState.cityName == "Locating..." ? .placeholder : [])
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.grocartPrimary)
+                Button(action: { showCityPicker = true }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "mappin.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.black)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Deliver to")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.black.opacity(0.55))
+                            HStack(spacing: 4) {
+                                Text(locationState.cityName)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(.black)
+                                    .redacted(reason: locationState.cityName == "Locating..." ? .placeholder : [])
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.black)
+                            }
                         }
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                 }
+                .glassPill(tint: .clear)
+                .buttonStyle(.plain)
                 
                 Spacer()
                 
@@ -100,14 +104,44 @@ struct HomeTabView: View {
                 }
                 .hidden()
 
+                NavigationLink(destination: PointsHistoryView(), isActive: $showPoints) {
+                    EmptyView()
+                }
+                .hidden()
+
                 HStack(spacing: 10) {
+                    Button(action: { showPoints = true }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.black)
+                            Text("\(pointsManager.points)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.black)
+                        }
+                        .frame(height: 40)
+                        .padding(.horizontal, 12)
+                        .glassPill()
+                    }
+
                     Button(action: { showNotifications = true }) {
                         Image(systemName: "bell")
                             .font(.system(size: 18))
                             .foregroundColor(.grocartPrimary)
                             .frame(width: 40, height: 40)
-                            .background(Color.grocartSecondaryBackground)
-                            .clipShape(Circle())
+                            .glassPill()
+                            .overlay(alignment: .topTrailing) {
+                                if notificationManager.unreadCount > 0 {
+                                    Text("\(min(notificationManager.unreadCount, 99))")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.red)
+                                        .clipShape(Capsule())
+                                        .offset(x: 4, y: -4)
+                                }
+                            }
                     }
 
                     Button(action: { showProfile = true }) {
@@ -115,8 +149,7 @@ struct HomeTabView: View {
                             .font(.system(size: 18))
                             .foregroundColor(.grocartPrimary)
                             .frame(width: 40, height: 40)
-                            .background(Color.grocartSecondaryBackground)
-                            .clipShape(Circle())
+                            .glassPill()
                     }
                 }
             }
@@ -186,22 +219,46 @@ struct HomeTabView: View {
             } else if viewModel.stores.isEmpty {
                 HStack {
                     Spacer()
-                    VStack(spacing: 12) {
-                        Image(systemName: "storefront")
-                            .font(.system(size: 32))
-                            .foregroundColor(.grocartSecondary)
-                        Text("No stores available in \(locationState.cityName)")
-                            .font(.system(size: 13))
-                            .foregroundColor(.grocartSecondary)
-                            .multilineTextAlignment(.center)
-                        Button(action: { showCityPicker = true }) {
-                            Text("Change City")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(Color.grocartGreen)
-                                .cornerRadius(10)
+                    if let errorMessage = viewModel.errorMessage {
+                        // The fetch failed (offline / backend down): say so
+                        // and offer a retry, instead of looking like the
+                        // app simply has no stores.
+                        VStack(spacing: 12) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .font(.system(size: 32))
+                                .foregroundColor(.grocartSecondary)
+                            Text(errorMessage)
+                                .font(.system(size: 13))
+                                .foregroundColor(.grocartSecondary)
+                                .multilineTextAlignment(.center)
+                            Button(action: { Task { await viewModel.refresh() } }) {
+                                Text("Retry")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(Color.grocartGreen)
+                                    .cornerRadius(10)
+                            }
+                        }
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "storefront")
+                                .font(.system(size: 32))
+                                .foregroundColor(.grocartSecondary)
+                            Text("No stores available in \(locationState.cityName)")
+                                .font(.system(size: 13))
+                                .foregroundColor(.grocartSecondary)
+                                .multilineTextAlignment(.center)
+                            Button(action: { showCityPicker = true }) {
+                                Text("Change City")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                    .background(Color.grocartGreen)
+                                    .cornerRadius(10)
+                            }
                         }
                     }
                     Spacer()
@@ -229,13 +286,19 @@ struct HomeTabView: View {
                 }
                 .padding(.horizontal, 20)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(viewModel.topProducts) { item in
-                            HomeProductCard(product: item.asProduct)
+                if let firstStore = viewModel.stores.first {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(viewModel.topProducts) { item in
+                                HomeProductCard(
+                                    product: item.asProduct,
+                                    categoryName: viewModel.topProductCategories[item.id] ?? "",
+                                    store: firstStore
+                                )
+                            }
                         }
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.horizontal, 20)
                 }
             }
         }
@@ -246,12 +309,16 @@ struct HomeTabView: View {
 // MARK: - Product Grid Card (Search results / Grid layout)
 struct ProductGridCard: View {
     let product: Product
-    
+    let categoryName: String
+    let store: Store
+
+    @ObservedObject private var cartManager = CartManager.shared
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Product Image
             ZStack(alignment: .topLeading) {
-                AsyncImage(url: URL(string: product.imageUrl)) { phase in
+                CachedAsyncImage(urlString: product.imageUrl) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -267,7 +334,7 @@ struct ProductGridCard: View {
                             .overlay(
                                 Image(systemName: "basket.fill")
                                     .font(.system(size: 26))
-                                    .foregroundColor(.grocartGreen.opacity(0.3))
+                                    .foregroundColor(.black.opacity(0.2))
                             )
                     default:
                         RoundedRectangle(cornerRadius: 10)
@@ -311,43 +378,68 @@ struct ProductGridCard: View {
 
                 Text(product.quantity)
                     .font(.system(size: 11))
-                    .foregroundColor(.grocartSecondary)
+                    .foregroundColor(.black)
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(product.formattedOfferPrice)
                             .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(.grocartGreen)
+                            .foregroundColor(.black)
 
                         Text(product.formattedOriginalPrice)
                             .font(.system(size: 11))
-                            .foregroundColor(.grocartSecondary)
+                            .foregroundColor(.black.opacity(0.55))
                             .strikethrough()
                             .opacity(product.isOnSale ? 1 : 0)
                     }
                     
                     Spacer()
-                    
-                    Button(action: {}) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 28, height: 28)
-                            .background(product.isInStock ? Color.grocartGreen : Color.gray)
-                            .clipShape(Circle())
+
+                    let qty = cartManager.count(for: product.id)
+                    if qty > 0 {
+                        HStack(spacing: 0) {
+                            Button(action: { cartManager.decrement(productId: product.id) }) {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.black)
+                                    .frame(width: 26, height: 26)
+                            }
+                            Text("\(qty)")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.black)
+                                .frame(minWidth: 20)
+                            Button(action: {
+                                cartManager.add(product: product, categoryName: categoryName, store: store)
+                            }) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 26, height: 26)
+                                    .background(Color.black)
+                                    .clipShape(Circle())
+                            }
+                        }
+                        .glassPill(tint: .clear)
+                    } else {
+                        Button(action: {
+                            guard product.isInStock else { return }
+                            cartManager.add(product: product, categoryName: categoryName, store: store)
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 28, height: 28)
+                                .background(product.isInStock ? Color.black : Color.gray)
+                                .clipShape(Circle())
+                        }
+                        .disabled(!product.isInStock)
                     }
-                    .disabled(!product.isInStock)
                 }
             }
             .padding(.horizontal, 4)
         }
         .padding(10)
-        .background(Color.grocartBackground)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.gray.opacity(0.12), lineWidth: 1)
-        )
+        .glassCard(cornerRadius: 20, tint: .clear)
     }
 }
 
@@ -373,7 +465,7 @@ struct HomeStoreSection: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.grocartPrimary)
                             .lineLimit(1)
-                        Text(store.address)
+                        Text(store.displayAddress)
                             .font(.system(size: 12))
                             .foregroundColor(.grocartSecondary)
                             .lineLimit(1)
@@ -406,14 +498,11 @@ struct HomeStoreSection: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(viewModel.products) { item in
-                            NavigationLink(destination: ProductDetailView(
+                            HomeProductCard(
                                 product: item.product,
                                 categoryName: item.categoryName,
                                 store: store
-                            )) {
-                                HomeProductCard(product: item.product)
-                            }
-                            .buttonStyle(.plain)
+                            )
                         }
                     }
                     .padding(.horizontal, 20)
@@ -433,7 +522,7 @@ struct HomeStoreSection: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.15), lineWidth: 1))
         } else if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 if case .success(let image) = phase {
                     image.resizable().aspectRatio(contentMode: .fill)
                 } else {
@@ -459,79 +548,140 @@ struct HomeStoreSection: View {
 // MARK: - Home Product Card (compact preview, tappable)
 struct HomeProductCard: View {
     let product: Product
+    let categoryName: String
+    let store: Store
+
+    @ObservedObject private var cartManager = CartManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                AsyncImage(url: URL(string: product.imageUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 140, height: 110)
-                            .clipped()
-                            .cornerRadius(12)
-                    default:
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.grocartSecondaryBackground)
-                            .frame(width: 140, height: 110)
-                            .overlay(
-                                Image(systemName: "basket.fill")
-                                    .font(.system(size: 30))
-                                    .foregroundColor(.grocartGreen.opacity(0.3))
-                            )
-                    }
-                }
+            // Tappable image + info navigates to detail
+            NavigationLink(destination: ProductDetailView(product: product, categoryName: categoryName, store: store)) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ZStack(alignment: .topLeading) {
+                        CachedAsyncImage(urlString: product.imageUrl) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 140, height: 110)
+                                    .clipped()
+                                    .cornerRadius(12)
+                            default:
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.grocartSecondaryBackground)
+                                    .frame(width: 140, height: 110)
+                                    .overlay(
+                                        Image(systemName: "basket.fill")
+                                            .font(.system(size: 30))
+                                            .foregroundColor(.black.opacity(0.2))
+                                    )
+                            }
+                        }
 
-                if product.isOnSale {
-                    Text("-\(product.discountPercentage)%")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color.red)
-                        .cornerRadius(6)
-                        .padding(6)
+                        if product.isOnSale {
+                            Text("-\(product.discountPercentage)%")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.red)
+                                .cornerRadius(6)
+                                .padding(6)
+                        }
+
+                        if !product.isInStock {
+                            VStack {
+                                Spacer()
+                                Text("Out of Stock")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 4)
+                                    .background(Color.black.opacity(0.6))
+                            }
+                            .cornerRadius(12)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(product.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.grocartPrimary)
+                            .lineLimit(2)
+                            .frame(width: 140, height: 34, alignment: .topLeading)
+
+                        Text(product.quantity)
+                            .font(.system(size: 11))
+                            .foregroundColor(.black)
+                    }
+                    .padding(.horizontal, 4)
                 }
             }
+            .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(product.name)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.grocartPrimary)
-                    .lineLimit(2)
-                    .frame(width: 140, height: 34, alignment: .topLeading)
-
-                Text(product.quantity)
-                    .font(.system(size: 11))
-                    .foregroundColor(.grocartSecondary)
-
-                HStack(spacing: 4) {
+            // Price + Add/Qty stepper (not part of navigation tap area)
+            let qty = cartManager.count(for: product.id)
+            HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(product.formattedOfferPrice)
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.grocartGreen)
+                        .foregroundColor(.black)
 
-                    if product.isOnSale {
-                        Text(product.formattedOriginalPrice)
-                            .font(.system(size: 11))
-                            .foregroundColor(.grocartSecondary)
-                            .strikethrough()
+                    Text(product.formattedOriginalPrice)
+                        .font(.system(size: 11))
+                        .foregroundColor(.black.opacity(0.55))
+                        .strikethrough()
+                        .opacity(product.isOnSale ? 1 : 0)
+                }
+
+                Spacer()
+
+                if qty > 0 {
+                    HStack(spacing: 0) {
+                        Button(action: { cartManager.decrement(productId: product.id) }) {
+                            Image(systemName: "minus")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.black)
+                                .frame(width: 26, height: 26)
+                        }
+                        Text("\(qty)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.black)
+                            .frame(minWidth: 20)
+                        Button(action: {
+                            cartManager.add(product: product, categoryName: categoryName, store: store)
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(width: 26, height: 26)
+                                .background(Color.black)
+                                .clipShape(Circle())
+                        }
                     }
-
-                    Spacer()
+                    .glassPill(tint: .clear)
+                } else {
+                    Button(action: {
+                        guard product.isInStock else { return }
+                        cartManager.add(product: product, categoryName: categoryName, store: store)
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 26, height: 26)
+                            .background(product.isInStock ? Color.black : Color.gray)
+                            .clipShape(Circle())
+                    }
+                    .disabled(!product.isInStock)
                 }
             }
             .padding(.horizontal, 4)
         }
         .padding(10)
         .frame(width: 160)
-        .background(Color.grocartBackground)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.gray.opacity(0.12), lineWidth: 1)
-        )
+        .glassCard(cornerRadius: 20, tint: .clear)
     }
 }
 
@@ -564,12 +714,7 @@ struct FeaturedStoreCard: View {
         }
         .padding(10)
         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-        .background(Color.grocartBackground)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.gray.opacity(0.12), lineWidth: 1)
-        )
+        .glassCard(cornerRadius: 20, tint: .clear)
     }
 
     @ViewBuilder
@@ -581,7 +726,7 @@ struct FeaturedStoreCard: View {
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 100, maxHeight: 100)
                 .clipped()
         } else if let bannerUrl = store.bannerUrl ?? store.logoUrl, let url = URL(string: bannerUrl) {
-            AsyncImage(url: url) { phase in
+            CachedAsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image

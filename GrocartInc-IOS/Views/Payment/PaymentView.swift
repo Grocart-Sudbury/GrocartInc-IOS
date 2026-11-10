@@ -329,8 +329,8 @@ struct ThreeDSHandlerView: View {
 
     private func handle3DS() {
         STPPaymentHandler.shared().handleNextAction(
-            forPayment: action.clientSecret,
-            with: TopViewControllerAuthContext(),
+            paymentIntentClientSecret: action.clientSecret,
+            authenticationContext: TopViewControllerAuthContext(),
             returnURL: nil
         ) { status, _, error in
             Task { @MainActor in

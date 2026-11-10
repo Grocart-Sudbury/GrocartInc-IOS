@@ -62,7 +62,7 @@ final class SignUpViewModel: ObservableObject {
             return
         }
         
-        logger.info("Form valid - proceeding with registration for email: \(self.email)")
+        logger.info("Form valid - proceeding with registration")
         
         errorMessage = nil
         isLoading = true
@@ -75,7 +75,7 @@ final class SignUpViewModel: ObservableObject {
             phone: phone.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         
-        logger.debug("RegisterRequest created - email: \(request.email), firstName: \(request.firstName), lastName: \(request.lastName), phone: \(request.phone)")
+        logger.debug("RegisterRequest created")
         
         let repo = authRepository
         
@@ -83,7 +83,7 @@ final class SignUpViewModel: ObservableObject {
             do {
                 logger.info("Calling register API...")
                 let response = try await repo.register(request: request)
-                logger.info("Registration successful - userId: \(response.userId), email: \(response.email), role: \(response.role)")
+                logger.info("Registration successful")
                 logger.info("Server message: \(response.message ?? "none")")
                 
                 isLoading = false

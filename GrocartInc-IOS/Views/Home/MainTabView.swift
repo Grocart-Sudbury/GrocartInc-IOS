@@ -28,13 +28,17 @@ struct MainTabView: View {
                     .toolbar(.hidden, for: .tabBar)
                     .tag(2)
 
-                ProfileView()
+                NavigationStack {
+                    ProfileView()
+                }
                     .toolbar(.hidden, for: .tabBar)
                     .tag(3)
             }
             .tint(.grocartGreen)
 
-            // Floating Navigation Bar (Home, Search pill, Cart with badge)
+            // Floating Navigation Bar (Home, Search pill, Cart with badge).
+            // It hides whenever a page asks for it (e.g. Profile, product
+            // and store pages) and pops back up everywhere else.
             if !tabBarManager.isHidden {
                 floatingBottomBar
                     .padding(.horizontal, 24)
@@ -47,6 +51,9 @@ struct MainTabView: View {
             tabBarManager.reset()
             selectedTab = 0
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToCart)) { _ in
+            selectedTab = 2
+        }
     }
 
     // MARK: - Floating Bottom Bar
@@ -58,11 +65,10 @@ struct MainTabView: View {
             }) {
                 Image(systemName: selectedTab == 0 ? "house.fill" : "house")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(selectedTab == 0 ? .white : .grocartPrimary)
+                    .foregroundColor(selectedTab == 0 ? .grocartNavy : .grocartPrimary)
                     .frame(width: 52, height: 52)
-                    .background(selectedTab == 0 ? Color.grocartGreen : Color.white)
+                    .background(selectedTab == 0 ? Color.grocartGreen : Color.clear)
                     .clipShape(Circle())
-                    .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
             }
 
             // Search pill button
@@ -75,12 +81,11 @@ struct MainTabView: View {
                     Text("Search")
                         .font(.system(size: 15, weight: .semibold))
                 }
-                .foregroundColor(selectedTab == 1 ? .white : .grocartPrimary)
+                .foregroundColor(selectedTab == 1 ? .grocartNavy : .grocartPrimary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
-                .background(selectedTab == 1 ? Color.grocartGreen : Color.white)
+                .background(selectedTab == 1 ? Color.grocartGreen : Color.clear)
                 .clipShape(Capsule())
-                .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
             }
 
             // Cart circular button with badge
@@ -90,11 +95,10 @@ struct MainTabView: View {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: selectedTab == 2 ? "cart.fill" : "cart")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(selectedTab == 2 ? .white : .grocartPrimary)
+                        .foregroundColor(selectedTab == 2 ? .grocartNavy : .grocartPrimary)
                         .frame(width: 52, height: 52)
-                        .background(selectedTab == 2 ? Color.grocartGreen : Color.white)
+                        .background(selectedTab == 2 ? Color.grocartGreen : Color.clear)
                         .clipShape(Circle())
-                        .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
 
                     if cartManager.itemCount > 0 {
                         Text("\(cartManager.itemCount)")
@@ -109,6 +113,8 @@ struct MainTabView: View {
                 }
             }
         }
+        .padding(6)
+        .glassPill()
     }
 }
 

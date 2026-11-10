@@ -39,7 +39,13 @@ final class PaymentViewModel: ObservableObject {
         didSet { logger.debug("❌ errorMessage → \(self.errorMessage ?? "nil")") }
     }
     @Published var requiresAction: PaymentActionState? = nil {
-        didSet { logger.debug("🔐 requiresAction → \(self.requiresAction == nil ? "nil" : "SET id=\(self.requiresAction!.paymentIntentId)")") }
+        didSet {
+            if let action = requiresAction {
+                logger.debug("🔐 requiresAction → SET id=\(action.paymentIntentId)")
+            } else {
+                logger.debug("🔐 requiresAction → nil")
+            }
+        }
     }
     @Published var paymentComplete = false {
         didSet { logger.debug("✅ paymentComplete → \(self.paymentComplete)") }

@@ -5,8 +5,10 @@ import SwiftUI
 
 struct ProfileView: View {
     @Environment(\.openURL) private var openURL
+    @Environment(\.dismiss) private var dismiss
     @StateObject private var profileVM = ProfileViewModel()
     @ObservedObject private var sessionManager = SessionManager.shared
+    @ObservedObject private var pointsManager = PointsManager.shared
     @State private var showSignOutAlert = false
     @State private var showEditProfile = false
     @State private var showDeleteWarning1 = false
@@ -20,13 +22,15 @@ struct ProfileView: View {
 
     private let menuItems: [(String, String, Color, AnyView)] = [
         ("bag.fill",         "My Orders",           .grocartGreen,                    AnyView(MyOrdersView())),
+        ("chart.bar.fill",   "Sales Report",        Color(red: 0.35, green: 0.45, blue: 0.6), AnyView(SalesReportView())),
+        ("repeat.circle.fill","Subscriptions",        .purple,                          AnyView(SubscriptionListView())),
         ("mappin.circle.fill","Delivery Addresses",  Color(red: 0.2, green: 0.6, blue: 0.9), AnyView(DeliveryAddressesView())),
+        ("creditcard.fill",  "Cards",                Color(red: 0.15, green: 0.35, blue: 0.75), AnyView(PaymentMethodsView())),
         ("ticket.fill",      "My Coupons",           .orange,                          AnyView(MyCouponsView()))
     ]
 
     var body: some View {
-        NavigationStack {
-            ZStack {
+        ZStack {
                 Color.grocartBackground.ignoresSafeArea()
 
                 if !sessionManager.isLoggedIn {
@@ -78,6 +82,66 @@ struct ProfileView: View {
                         }
                         .padding(.top, 10)
                         .padding(.bottom, 10)
+
+                        // Points — tap to see the points earned per purchase
+                        NavigationLink(destination: PointsHistoryView()) {
+                            VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 10) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.grocartGreen.opacity(0.12))
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "star.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.grocartGreen)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("My Points")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundColor(.grocartPrimary)
+                                    Text("\(pointsManager.points) points")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(.grocartPrimary)
+                                }
+                                Spacer()
+                                if pointsManager.canRedeem {
+                                    Text("$5 OFF")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color.grocartGreen)
+                                        .cornerRadius(20)
+                                }
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.grocartSecondary)
+                            }
+
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.grocartGreen.opacity(0.15))
+                                        .frame(height: 8)
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.grocartGreen)
+                                        .frame(width: geo.size.width * pointsManager.progressToReward, height: 8)
+                                }
+                            }
+                            .frame(height: 8)
+
+                            Text(pointsManager.canRedeem
+                                 ? "You can redeem $5 off your next order at checkout."
+                                 : "\(pointsManager.pointsToNextReward) more points to unlock $5 off. Earn 1 point per $1 spent.")
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                        }
+                        .padding(16)
+                        .background(Color.grocartSecondaryBackground)
+                        .cornerRadius(16)
+                        .padding(.horizontal, 20)
+                        }
+                        .buttonStyle(.plain)
 
                         // Menu Items
                         VStack(spacing: 2) {
@@ -142,6 +206,21 @@ struct ProfileView: View {
             }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                // The tab bar is hidden on Profile, so this is the way back Home.
+                // Dismiss pops Profile when it was pushed from Home; the
+                // notification switches to the Home tab when it was the tab.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        dismiss()
+                        NotificationCenter.default.post(name: .navigateToHome, object: nil)
+                    }) {
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.grocartGreen)
+                    }
+                }
+            }
             .onAppear { profileVM.load() }
             .sheet(isPresented: $showEditProfile) {
                 EditProfileView(viewModel: profileVM)
@@ -194,7 +273,10 @@ struct ProfileView: View {
             .sheet(isPresented: $showSignUp) {
                 SignUpView()
             }
-        }
+        // The tab bar stays hidden on Profile — whether it was reached
+        // from the Profile tab or pushed from Home — and pops back up
+        // on every other page.
+        .hideFloatingBottomBar()
     }
 
     // MARK: - Guest View
@@ -351,7 +433,7 @@ struct DeleteConfirmSheet: View {
                     TextField("", text: $typed)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.characters)
-                        .font(.system(size: 17, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                         .frame(height: 48)

@@ -14,53 +14,30 @@
 
 import SwiftUI
 
-// MARK: - Notification Model
-struct AppNotification: Identifiable {
-    let id = UUID()
-    let type: NotificationType
-    let title: String
-    let message: String
-    let time: String
-    var isRead: Bool
-}
-
-enum NotificationType {
-    case order, promo, delivery, system
-    
-    var icon: String {
-        switch self {
-        case .order: return "bag.fill"
-        case .promo: return "tag.fill"
-        case .delivery: return "truck.box.fill"
-        case .system: return "bell.fill"
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .order: return Color(red: 0.18, green: 0.72, blue: 0.47)
-        case .promo: return .orange
-        case .delivery: return Color(red: 0.25, green: 0.55, blue: 0.95)
-        case .system: return .purple
-        }
-    }
-}
+// The notification model and types live in NotificationManager
+// (Core/NotificationManager.swift) — this view just shows them.
 
 // MARK: - Notifications View
 struct NotificationsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var notifications: [AppNotification] = []
-    
+    @ObservedObject private var notificationManager = NotificationManager.shared
+    @State private var selectedProductLink: ProductLink?
+    @State private var isResolvingProduct = false
+
+    private var notifications: [AppNotification] {
+        notificationManager.notifications
+    }
+
     private var unreadCount: Int {
-        notifications.filter { !$0.isRead }.count
+        notificationManager.unreadCount
     }
-    
+
     private var todayNotifications: [AppNotification] {
-        notifications.filter { $0.time.contains("min") || $0.time.contains("hour") }
+        notifications.filter { $0.isToday }
     }
-    
+
     private var earlierNotifications: [AppNotification] {
-        notifications.filter { !($0.time.contains("min") || $0.time.contains("hour")) }
+        notifications.filter { !$0.isToday }
     }
     
     var body: some View {
@@ -105,9 +82,7 @@ struct NotificationsView: View {
                                 
                                 Button {
                                     withAnimation(.easeInOut(duration: 0.3)) {
-                                        for i in notifications.indices {
-                                            notifications[i].isRead = true
-                                        }
+                                        notificationManager.markAllRead()
                                     }
                                 } label: {
                                     Text("Mark all read")
@@ -126,10 +101,8 @@ struct NotificationsView: View {
                         if !todayNotifications.isEmpty {
                             NotificationSection(
                                 title: "Today",
-                                notifications: todayNotifications.map { notif in
-                                    notifications.first(where: { $0.id == notif.id })!
-                                },
-                                onTap: { id in markAsRead(id: id) },
+                                notifications: todayNotifications,
+                                onTap: { id in handleTap(id: id) },
                                 onDelete: { id in deleteNotification(id: id) }
                             )
                         }
@@ -138,10 +111,8 @@ struct NotificationsView: View {
                         if !earlierNotifications.isEmpty {
                             NotificationSection(
                                 title: "Earlier",
-                                notifications: earlierNotifications.map { notif in
-                                    notifications.first(where: { $0.id == notif.id })!
-                                },
-                                onTap: { id in markAsRead(id: id) },
+                                notifications: earlierNotifications,
+                                onTap: { id in handleTap(id: id) },
                                 onDelete: { id in deleteNotification(id: id) }
                             )
                         }
@@ -150,6 +121,29 @@ struct NotificationsView: View {
                     }
                     .padding(.top, 10)
                 }
+            }
+
+            // Tapping a new-product or price-change notification opens
+            // that product's page. The link is driven by tag/selection:
+            // it appears (and pushes) as soon as a product is selected,
+            // and popping back clears the selection. (The old hidden
+            // isActive link never pushed from inside this NavigationView.)
+            if let link = selectedProductLink {
+                NavigationLink(
+                    destination: ProductDetailView(product: link.product, categoryName: link.categoryName, store: link.store),
+                    tag: link,
+                    selection: $selectedProductLink,
+                    label: { EmptyView() }
+                )
+                .hidden()
+            }
+
+            if isResolvingProduct {
+                ProgressView()
+                    .scaleEffect(1.3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.25))
+                    .ignoresSafeArea()
             }
         }
         .navigationTitle("Notifications")
@@ -169,9 +163,7 @@ struct NotificationsView: View {
                     Menu {
                         Button(action: {
                             withAnimation {
-                                for i in notifications.indices {
-                                    notifications[i].isRead = true
-                                }
+                                notificationManager.markAllRead()
                             }
                         }) {
                             Label("Mark All as Read", systemImage: "checkmark.circle")
@@ -179,7 +171,7 @@ struct NotificationsView: View {
                         
                         Button(role: .destructive, action: {
                             withAnimation {
-                                notifications.removeAll(where: { $0.isRead })
+                                notificationManager.clearRead()
                             }
                         }) {
                             Label("Clear Read", systemImage: "trash")
@@ -194,17 +186,58 @@ struct NotificationsView: View {
         }
     }
     
-    private func markAsRead(id: UUID) {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            if let idx = notifications.firstIndex(where: { $0.id == id }) {
-                notifications[idx].isRead = true
+    private func handleTap(id: UUID) {
+        markAsRead(id: id)
+        guard let notification = notifications.first(where: { $0.id == id }) else { return }
+        // A new-product or price-change notification opens that product.
+        if let link = notification.productLink {
+            selectedProductLink = link
+        } else if notification.type == .product || notification.type == .price {
+            // Older notification from before the product link was stored:
+            // find the product by name in the live catalogue.
+            resolveProduct(from: notification)
+        }
+    }
+
+    /// The product name is after the ": " in titles like
+    /// "New product: Sambar Mix" or "Price change: Sambar Mix".
+    private func productName(from notification: AppNotification) -> String {
+        notification.title.components(separatedBy: ": ").last ?? notification.title
+    }
+
+    private func resolveProduct(from notification: AppNotification) {
+        let name = productName(from: notification)
+        let city = LocationState.shared.cityName
+        guard !city.isEmpty, city != "Locating...", city != "Location Off" else { return }
+        isResolvingProduct = true
+        Task {
+            let searchViewModel = SearchViewModel()
+            await searchViewModel.loadAll(city: city)
+            let match = searchViewModel.allItems.first {
+                $0.product.name.localizedCaseInsensitiveCompare(name) == .orderedSame
+            }
+            await MainActor.run {
+                isResolvingProduct = false
+                if let match = match {
+                    selectedProductLink = ProductLink(
+                        product: match.product,
+                        store: match.store,
+                        categoryName: match.categoryName
+                    )
+                }
             }
         }
     }
-    
+
+    private func markAsRead(id: UUID) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            notificationManager.markAsRead(id: id)
+        }
+    }
+
     private func deleteNotification(id: UUID) {
         withAnimation(.easeInOut(duration: 0.3)) {
-            notifications.removeAll { $0.id == id }
+            notificationManager.delete(id: id)
         }
     }
 }

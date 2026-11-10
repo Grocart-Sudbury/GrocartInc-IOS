@@ -20,8 +20,6 @@ struct CartView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.grocartBackground.ignoresSafeArea()
-
                 if cartManager.isEmpty {
                     emptyView
                 } else {
@@ -40,11 +38,13 @@ struct CartView: View {
                 ) { EmptyView() }
                     .hidden()
             }
-            .navigationTitle("My Cart")
+            .clearGlassBackground()
+            .navigationTitle(cartTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear { viewModel.loadSuggestions() }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { dismiss() }) {
+                    Button(action: { goHome() }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(.grocartPrimary)
@@ -61,6 +61,21 @@ struct CartView: View {
         }
     }
 
+    // MARK: - Title (with total item count)
+    private var cartTitle: String {
+        guard !cartManager.isEmpty else { return "My Cart" }
+        return "My Cart · \(cartManager.itemCount) item\(cartManager.itemCount == 1 ? "" : "s")"
+    }
+
+    // MARK: - Go Home (X button)
+    private func goHome() {
+        // Close the cart itself (when it is open as a sheet over a store),
+        // then tell the app to switch to the Home tab. The store page also
+        // listens for this and pops itself, so the user lands on Home.
+        dismiss()
+        NotificationCenter.default.post(name: .navigateToHome, object: nil)
+    }
+
     // MARK: - Cart Content
     private var cartContent: some View {
         VStack(spacing: 0) {
@@ -71,14 +86,12 @@ struct CartView: View {
                         storeBanner(store: store)
                     }
 
-                    // Cart items
-                    VStack(spacing: 1) {
+                    // Cart items — each product in its own glass card
+                    VStack(spacing: 12) {
                         ForEach(cartManager.items) { item in
                             cartRow(item: item)
                         }
                     }
-                    .background(Color.grocartSecondaryBackground.opacity(0.5))
-                    .cornerRadius(14)
                     .padding(.horizontal, 16)
                     .padding(.top, 16)
 
@@ -87,7 +100,13 @@ struct CartView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
 
-                    Spacer().frame(height: 100)
+                    // Suggestions based on what's in the cart
+                    suggestionsSection
+                        .padding(.horizontal, 16)
+                        .padding(.top, 24)
+
+                    // Room for the raised checkout button + floating tab bar.
+                    Spacer().frame(height: 170)
                 }
             }
 
@@ -118,15 +137,14 @@ struct CartView: View {
                 Text(store.name)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.grocartPrimary)
-                Text(store.address)
+                Text(store.displayAddress)
                     .font(.system(size: 11))
                     .foregroundColor(.grocartSecondary)
             }
             Spacer()
         }
         .padding(14)
-        .background(Color.grocartGreen.opacity(0.08))
-        .cornerRadius(12)
+        .glassCard(cornerRadius: 14, tint: .clear)
         .padding(.horizontal, 16)
         .padding(.top, 16)
     }
@@ -134,7 +152,7 @@ struct CartView: View {
     // MARK: - Cart Row
     private func cartRow(item: CartItem) -> some View {
         HStack(spacing: 12) {
-            AsyncImage(url: URL(string: item.product.imageUrl)) { phase in
+            CachedAsyncImage(urlString: item.product.imageUrl) { phase in
                 if case .success(let image) = phase {
                     image.resizable().aspectRatio(contentMode: .fill)
                 } else {
@@ -151,10 +169,10 @@ struct CartView: View {
                     .lineLimit(2)
                 Text(item.product.quantity)
                     .font(.system(size: 11))
-                    .foregroundColor(.grocartSecondary)
+                    .foregroundColor(.black)
                 Text(item.product.formattedOfferPrice)
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.grocartGreen)
+                    .foregroundColor(.black)
             }
 
             Spacer()
@@ -164,12 +182,12 @@ struct CartView: View {
                 Button(action: { cartManager.decrement(productId: item.product.id) }) {
                     Image(systemName: "minus")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.grocartGreen)
+                        .foregroundColor(.black)
                         .frame(width: 20, height: 20)
                 }
                 Text("\(item.count)")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.grocartPrimary)
+                    .foregroundColor(.black)
                     .frame(minWidth: 24)
                 Button(action: {
                     cartManager.add(product: item.product, categoryName: item.categoryName, store: item.store)
@@ -178,15 +196,14 @@ struct CartView: View {
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
                         .frame(width: 20, height: 20)
-                        .background(Color.grocartGreen)
+                        .background(Color.black)
                         .clipShape(Circle())
                 }
             }
-            .background(Color.grocartBackground)
-            .cornerRadius(15)
+            .glassPill(tint: .clear)
         }
         .padding(14)
-        .background(Color.grocartBackground)
+        .glassCard(cornerRadius: 16, tint: .clear)
     }
 
     // MARK: - Pricing Section
@@ -218,8 +235,7 @@ struct CartView: View {
             }
         }
         .padding(16)
-        .background(Color.grocartSecondaryBackground.opacity(0.5))
-        .cornerRadius(14)
+        .glassCard(cornerRadius: 16, tint: .clear)
     }
 
     private func pricingRows(pricing: CartPricingResponse) -> some View {
@@ -230,7 +246,7 @@ struct CartView: View {
                 pricingRow(label: "Service Fee", value: pricing.formattedServiceFee)
             }
             if pricing.discount > 0 {
-                pricingRow(label: "Discount", value: pricing.formattedDiscount, valueColor: .green)
+                pricingRow(label: "Discount", value: pricing.formattedDiscount, valueColor: .grocartGreen)
             }
             Divider().padding(.vertical, 4)
             HStack {
@@ -240,7 +256,7 @@ struct CartView: View {
                 Spacer()
                 Text(pricing.formattedTotal)
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.grocartGreen)
+                    .foregroundColor(.black)
             }
         }
     }
@@ -299,30 +315,89 @@ struct CartView: View {
                 .background(viewModel.pricing != nil ? Color.grocartGreen : Color.grocartGreen.opacity(0.5))
                 .cornerRadius(16)
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                // Lifted above the floating tab bar (Home / Search / Cart),
+                // which floats over the bottom ~76pt of the screen.
+                .padding(.bottom, 88)
             }
             .disabled(viewModel.pricing == nil)
         }
-        .background(Color.grocartBackground)
         .onChange(of: cartManager.items.count) { _ in minOrderError = nil }
+    }
+
+    // MARK: - Suggestions
+    // Empty cart: top selling items in a grid. Cart with products: items
+    // from the same categories in a sideways-scrolling row. Tapping a card
+    // opens the product; the + button adds it straight to the cart.
+    private var suggestionsSection: some View {
+        Group {
+            if !viewModel.suggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(viewModel.suggestionsTitle)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+
+                    if cartManager.isEmpty {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 12),
+                                GridItem(.flexible(), spacing: 12)
+                            ],
+                            spacing: 12
+                        ) {
+                            ForEach(viewModel.suggestions) { item in
+                                NavigationLink(destination: ProductDetailView(product: item.product, categoryName: item.categoryName, store: item.store)) {
+                                    SearchProductCard(item: item)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(viewModel.suggestions) { item in
+                                    NavigationLink(destination: ProductDetailView(product: item.product, categoryName: item.categoryName, store: item.store)) {
+                                        SearchProductCard(item: item)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(width: 170)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Empty
     private var emptyView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: "cart")
-                .font(.system(size: 56))
-                .foregroundColor(.grocartSecondary.opacity(0.4))
-            Text("Your cart is empty")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.grocartPrimary)
-            Text("Browse stores and add items to get started")
-                .font(.system(size: 15))
-                .foregroundColor(.grocartSecondary)
-                .multilineTextAlignment(.center)
-            Spacer()
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 24) {
+                VStack(spacing: 20) {
+                    Image(systemName: "cart")
+                        .font(.system(size: 56))
+                        .foregroundColor(.grocartSecondary.opacity(0.4))
+                    Text("Your cart is empty")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+                    Text("Browse stores and add items to get started")
+                        .font(.system(size: 15))
+                        .foregroundColor(.grocartSecondary)
+                        .multilineTextAlignment(.center)
+                    Button(action: { goHome() }) {
+                        Text("Browse stores")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .buttonStyle(.glassPrimary)
+                    .padding(.horizontal, 40)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 40)
+
+                suggestionsSection
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
-        .padding(.horizontal, 40)
     }
 }

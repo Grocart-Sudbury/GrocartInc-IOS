@@ -18,13 +18,12 @@ struct SignUpView: View {
             VStack(spacing: 24) {
                 // Header
                 VStack(spacing: 8) {
-                    Image(systemName: "cart.fill")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.green)
-                    
-                    Text("Create Account")
-                        .font(.system(size: 28, weight: .bold))
-                    
+                    Image("GrocartLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 200)
+                        .padding(.bottom, 8)
+
                     Text("Sign up to start ordering fresh groceries")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -115,12 +114,12 @@ struct SignUpView: View {
                         viewModel.agreedToTerms.toggle()
                     } label: {
                         Image(systemName: viewModel.agreedToTerms ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(viewModel.agreedToTerms ? .green : .secondary)
+                            .foregroundStyle(viewModel.agreedToTerms ? Color.grocartGreen : Color.secondary)
                             .font(.title3)
                     }
                     
                     Text("I agree to the **[Terms of Service](terms)** and **[Privacy Policy](privacy)**")
-                        .tint(.green)
+                        .tint(Color.grocartGreen)
                 }
                 .font(.footnote)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,7 +142,7 @@ struct SignUpView: View {
                     .padding(.vertical, 16)
                     .background(
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(viewModel.isFormValid ? .green : .green.opacity(0.4))
+                            .fill(viewModel.isFormValid ? Color.grocartGreen : Color.grocartGreen.opacity(0.4))
                     )
                 }
                 .disabled(!viewModel.isFormValid || viewModel.isLoading)
@@ -155,7 +154,7 @@ struct SignUpView: View {
                     Button("Sign In") {
                         dismiss()
                     }
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.grocartGreen)
                     .fontWeight(.semibold)
                 }
                 .font(.subheadline)

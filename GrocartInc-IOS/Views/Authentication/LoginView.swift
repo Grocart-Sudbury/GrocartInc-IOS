@@ -13,6 +13,7 @@ struct LoginView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showPassword = false
     @State private var navigateToOTP = false
+    @State private var showWelcome = false
 
     var body: some View {
         NavigationView {
@@ -22,31 +23,30 @@ struct LoginView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         // Header Section
-                        VStack(spacing: 16) {
+                        VStack(spacing: 0) {
                             Spacer()
                                 .frame(height: 60)
-                            
+
                             // Logo
-                            ZStack {
-                                Circle()
-                                    .fill(Color.grocartGreen.opacity(0.1))
-                                    .frame(width: 100, height: 100)
-                                
-                                Image(systemName: "cart.fill")
-                                    .resizable()
-                                    .frame(width: 50, height: 50)
-                                    .foregroundColor(.grocartGreen)
-                            }
-                            
-                            Text("GroCart")
-                                .font(.system(size: 32, weight: .bold))
-                                .foregroundColor(.grocartPrimary)
-                            
-                            Text("Fresh groceries delivered to Northern Ontario")
-                                .font(.system(size: 15))
-                                .foregroundColor(.grocartSecondary)
+                            Image("GrocartLogo")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 200)
+                                .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+
+                            // Tagline, close under the logo
+                            Text("We deliver all your favourites")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.grocartNavy)
                                 .multilineTextAlignment(.center)
+                                .padding(.top, 8)
                                 .padding(.horizontal, 40)
+
+                            // Fine divider
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(Color.grocartGreen)
+                                .frame(width: 36, height: 2)
+                                .padding(.top, 14)
                         }
                         .padding(.bottom, 50)
                         
@@ -213,8 +213,21 @@ struct LoginView: View {
             .navigationBarHidden(true)
             .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
             .onChange(of: sessionManager.isLoggedIn) { loggedIn in
-                if loggedIn { dismiss() }
+                if loggedIn {
+                    // Play the welcome animation, then return to the app
+                    showWelcome = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
+                        dismiss()
+                    }
+                }
             }
+            .overlay {
+                if showWelcome {
+                    WelcomeBackView()
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.4), value: showWelcome)
         }
     }
 }

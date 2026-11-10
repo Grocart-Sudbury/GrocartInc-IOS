@@ -9,7 +9,9 @@ import SwiftUI
 
 struct OTPLoginView: View {
     @StateObject private var viewModel = OTPViewModel()
+    @ObservedObject private var sessionManager = SessionManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var showWelcome = false
 
     var body: some View {
         ZStack {
@@ -80,6 +82,20 @@ struct OTPLoginView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: viewModel.step)
         .animation(.easeInOut(duration: 0.3), value: viewModel.errorMessage)
+        .onChange(of: sessionManager.isLoggedIn) { loggedIn in
+            // The OTP screen sits on top of the sign-in screen, so the
+            // welcome overlay on LoginView is hidden behind it — show
+            // the welcome here instead. LoginView still dismisses the
+            // whole sign-in flow once the animation has played.
+            if loggedIn { showWelcome = true }
+        }
+        .overlay {
+            if showWelcome {
+                WelcomeBackView()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.4), value: showWelcome)
     }
 
     // MARK: - Email Section

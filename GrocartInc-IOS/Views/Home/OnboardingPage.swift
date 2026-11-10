@@ -71,8 +71,6 @@ struct OnboardingView: View {
     
     var body: some View {
         ZStack {
-            Color.grocartBackground.ignoresSafeArea()
-            
             VStack(spacing: 0) {
                 // Skip button
                 HStack {
@@ -128,23 +126,12 @@ struct OnboardingView: View {
                         HStack(spacing: 8) {
                             Text(currentPage < pages.count - 1 ? "Next" : "Get Started")
                                 .font(.system(size: 17, weight: .semibold))
-                            
+
                             Image(systemName: currentPage < pages.count - 1 ? "arrow.right" : "checkmark")
                                 .font(.system(size: 14, weight: .bold))
                         }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            LinearGradient(
-                                colors: pages[currentPage].gradientColors,
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(16)
-                        .shadow(color: pages[currentPage].gradientColors[0].opacity(0.4), radius: 12, y: 6)
                     }
+                    .buttonStyle(GlassPrimaryButtonStyle(tint: pages[currentPage].gradientColors[0]))
                     .animation(.easeInOut(duration: 0.3), value: currentPage)
                     
                     // Page count
@@ -156,6 +143,7 @@ struct OnboardingView: View {
                 .padding(.bottom, 40)
             }
         }
+        .glassBackground()
         .navigationBarHidden(true)
     }
 }
@@ -271,10 +259,7 @@ struct OnboardingPageView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.grocartSecondaryBackground)
-                    )
+                    .glassCard(cornerRadius: 16)
                     .opacity(appeared ? 1 : 0)
                     .offset(x: appeared ? 0 : 30)
                     .animation(

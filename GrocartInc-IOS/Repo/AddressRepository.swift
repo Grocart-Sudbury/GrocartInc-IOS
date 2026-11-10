@@ -10,13 +10,14 @@ nonisolated(unsafe) private let logger = Logger(subsystem: "com.grocartinc.ios",
 final class AddressRepository: @unchecked Sendable {
 
     nonisolated(unsafe) static let shared = AddressRepository()
+    private static let decoder = JSONDecoder()
     private init() {}
 
     // MARK: - Helpers
 
     nonisolated private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         do {
-            return try JSONDecoder().decode(type, from: data)
+            return try Self.decoder.decode(type, from: data)
         } catch {
             logger.error("DECODE ERROR: \(error)")
             throw NetworkError.unknown(error)
@@ -30,7 +31,7 @@ final class AddressRepository: @unchecked Sendable {
             logger.error("AF ERROR: \(afError)")
         }
         if let data = response.data,
-           let errResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+           let errResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
             throw NetworkError.serverError(errResponse.displayMessage)
         }
         if response.response?.statusCode == 401 { throw NetworkError.unauthorized }
@@ -55,7 +56,7 @@ final class AddressRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW: \(raw.prefix(500))")
             // The API returns either an array directly or a wrapper object
-            if let list = try? JSONDecoder().decode([CustomerAddress].self, from: data) {
+            if let list = try? Self.decoder.decode([CustomerAddress].self, from: data) {
                 return list
             }
             let wrapper = try decode(AddressListResponse.self, from: data)

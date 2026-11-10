@@ -14,6 +14,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "PaymentR
 final class PaymentRepository: @unchecked Sendable {
 
     static let shared = PaymentRepository()
+    private static let decoder = JSONDecoder()
     private init() {}
 
     // MARK: - Get Saved Cards
@@ -104,7 +105,7 @@ final class PaymentRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RESPONSE: \(raw.prefix(300))")
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try Self.decoder.decode(T.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.decodingError
@@ -118,7 +119,7 @@ final class PaymentRepository: @unchecked Sendable {
         let body = response.data.flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
         logger.error("FAILED: \(body)")
         if let data = response.data,
-           let errResponse = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+           let errResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
             return NetworkError.serverError(errResponse.displayMessage)
         }
         if response.response?.statusCode == 401 { return NetworkError.unauthorized }

@@ -41,8 +41,6 @@ struct StoreDetailView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            Color.grocartBackground.ignoresSafeArea()
-
             if viewModel.isLoading {
                 loadingView
             } else if let error = viewModel.errorMessage {
@@ -55,15 +53,20 @@ struct StoreDetailView: View {
             Button(action: { dismiss() }) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundColor(.grocartPrimary)
                     .padding(10)
-                    .background(Color.black.opacity(0.35))
-                    .clipShape(Circle())
+                    .glassPill()
             }
             .padding(.top, 56)
             .padding(.leading, 16)
         }
+        .clearGlassBackground()
         .navigationBarHidden(true)
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToHome)) { _ in
+            // The cart's X means "go home": pop this store page too, so the
+            // user lands on the home screen itself, not back on the store.
+            dismiss()
+        }
         .onAppear { viewModel.loadCategories() }
         .onChange(of: viewModel.categories.count) { _ in
             if selectedCategoryId == nil { selectedCategoryId = viewModel.categories.first?.id }
@@ -99,7 +102,7 @@ struct StoreDetailView: View {
         }
     }
 
-    // MARK: - Category Bar (horizontal chips, no scroll-position tracking)
+    // MARK: - Category Bar (horizontal pills, no scroll-position tracking)
     private var categoryBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -107,25 +110,24 @@ struct StoreDetailView: View {
                     let isActive = selectedCategoryId == category.id
                     Button(action: { selectedCategoryId = category.id }) {
                         Text(category.name)
-                            .font(.system(size: 13, weight: isActive ? .semibold : .regular))
+                            .font(.system(size: 13, weight: isActive ? .semibold : .medium))
                             .foregroundColor(isActive ? .white : .grocartPrimary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(isActive ? Color.grocartGreen : Color.grocartSecondaryBackground)
-                            .cornerRadius(20)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 9)
+                            .background(isActive ? Color.black : Color.clear)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.black.opacity(0.12), lineWidth: isActive ? 0 : 1)
+                            )
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
         }
-        .background(Color.grocartBackground)
-        .overlay(
-            Rectangle()
-                .fill(Color.gray.opacity(0.12))
-                .frame(height: 1),
-            alignment: .bottom
-        )
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Selected Category Products
@@ -144,7 +146,21 @@ struct StoreDetailView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 60)
             } else {
-                LazyVGrid(columns: gridColumns, spacing: 14) {
+                // Section header: which category, and how many products.
+                HStack(alignment: .firstTextBaseline) {
+                    Text(category.name)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+                    Spacer()
+                    Text("\(category.products.count) products")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.grocartSecondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
+
+                LazyVGrid(columns: gridColumns, spacing: 16) {
                     ForEach(category.products) { product in
                         StoreProductCard(
                             product: product,
@@ -154,7 +170,6 @@ struct StoreDetailView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
                 .padding(.bottom, 8)
             }
         }
@@ -175,7 +190,21 @@ struct StoreDetailView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 60)
         } else {
-            LazyVGrid(columns: gridColumns, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Results for \"\(searchText)\"")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.grocartPrimary)
+                    .lineLimit(1)
+                Spacer()
+                Text("\(searchResults.count) products")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.grocartSecondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+
+            LazyVGrid(columns: gridColumns, spacing: 16) {
                 ForEach(searchResults, id: \.product.id) { item in
                     StoreProductCard(
                         product: item.product,
@@ -185,7 +214,6 @@ struct StoreDetailView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.top, 16)
         }
     }
 
@@ -197,28 +225,26 @@ struct StoreDetailView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(Color.white.opacity(0.25))
+                            .fill(Color.grocartGreen.opacity(0.35))
                             .frame(width: 32, height: 32)
                         Text("\(cartManager.itemCount)")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(.grocartNavy)
                     }
 
                     Text("View Cart")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.grocartNavy)
 
                     Spacer()
 
                     Text(cartManager.formattedSubtotal)
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.grocartNavy)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
-                .background(Color.grocartGreen)
-                .cornerRadius(16)
-                .shadow(color: Color.grocartGreen.opacity(0.4), radius: 10, y: 4)
+                .glassCard(cornerRadius: 20, tint: .clear)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 8)
             }
@@ -237,7 +263,7 @@ struct StoreDetailView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                 } else if let bannerUrl = viewModel.store.bannerUrl, let url = URL(string: bannerUrl) {
-                    AsyncImage(url: url) { phase in
+                    CachedAsyncImage(url: url) { phase in
                         switch phase {
                         case .success(let image):
                             image.resizable().aspectRatio(contentMode: .fill)
@@ -256,73 +282,67 @@ struct StoreDetailView: View {
                 }
 
                 LinearGradient(
-                    colors: [Color.clear, Color.black.opacity(0.5)],
+                    colors: [Color.clear, Color.black.opacity(0.35)],
                     startPoint: .top, endPoint: .bottom
                 )
             }
-            .frame(height: 200)
+            .frame(height: 220)
             .clipped()
 
-            // Store info row
-            HStack(alignment: .top, spacing: 14) {
-                if let assetName = viewModel.store.bundledIconAssetName {
-                    Image(assetName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .padding(10)
-                        .frame(width: 64, height: 64)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white, lineWidth: 2))
-                        .offset(y: -20)
-                } else if let logoUrl = viewModel.store.logoUrl, let url = URL(string: logoUrl) {
-                    AsyncImage(url: url) { phase in
-                        if case .success(let image) = phase {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            Color.grocartGreen
+            // Store card — floats over the banner with the store identity
+            // and the key facts, so the page reads as one organised card.
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .top, spacing: 14) {
+                    storeIcon
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(viewModel.store.name)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.grocartPrimary)
+
+                        HStack(spacing: 5) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                            Text(viewModel.store.displayAddress)
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                                .lineLimit(1)
                         }
                     }
-                    .frame(width: 64, height: 64)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white, lineWidth: 2))
-                    .offset(y: -20)
+
+                    Spacer()
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.store.name)
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.grocartPrimary)
+                if !viewModel.store.description.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text(viewModel.store.description)
+                        .font(.system(size: 13))
+                        .foregroundColor(.grocartPrimary.opacity(0.75))
+                        .lineLimit(2)
+                }
 
-                    HStack(spacing: 6) {
-                        Image(systemName: "mappin.circle")
-                            .font(.system(size: 12))
-                            .foregroundColor(.grocartSecondary)
-                        Text(viewModel.store.address)
-                            .font(.system(size: 12))
-                            .foregroundColor(.grocartSecondary)
-                    }
-
-                    HStack(spacing: 12) {
-                        Text(viewModel.store.formattedMinOrder)
-                            .font(.system(size: 12))
-                            .foregroundColor(.grocartSecondary)
+                // Key facts as small pills.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        storeFactPill(icon: "bag.fill", text: viewModel.store.formattedMinOrder)
+                        storeFactPill(icon: "bicycle", text: viewModel.store.formattedDeliveryFee)
+                        storeFactPill(icon: "square.grid.2x2.fill", text: "\(totalProductCount) products")
+                        storeFactPill(icon: "list.bullet", text: "\(viewModel.categories.count) categories")
                     }
                 }
-                .padding(.top, 6)
-
-                Spacer()
             }
+            .padding(16)
+            .glassCard(cornerRadius: 22, tint: .clear)
             .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .background(Color.grocartBackground)
+            .offset(y: -28)
+            .padding(.bottom, -28)
 
             // Search bar
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14))
                     .foregroundColor(.grocartSecondary)
-                TextField("Search products...", text: $searchText)
+                TextField("Search in \(viewModel.store.name)...", text: $searchText)
                     .font(.system(size: 14))
                 if isSearching {
                     Button(action: { searchText = "" }) {
@@ -332,12 +352,55 @@ struct StoreDetailView: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color.grocartSecondaryBackground)
-            .cornerRadius(10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .glassCard(cornerRadius: 16, tint: .clear)
             .padding(.horizontal, 16)
+            .padding(.top, 16)
             .padding(.bottom, 12)
+        }
+    }
+
+    private var totalProductCount: Int {
+        viewModel.categories.reduce(0) { $0 + $1.products.count }
+    }
+
+    private func storeFactPill(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(text)
+                .font(.system(size: 12, weight: .semibold))
+        }
+        .foregroundColor(.grocartNavy)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.grocartGreen.opacity(0.25))
+        .clipShape(Capsule())
+    }
+
+    @ViewBuilder
+    private var storeIcon: some View {
+        if let assetName = viewModel.store.bundledIconAssetName {
+            Image(assetName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .padding(8)
+                .frame(width: 56, height: 56)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 2)
+        } else if let logoUrl = viewModel.store.logoUrl, let url = URL(string: logoUrl) {
+            CachedAsyncImage(url: url) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } else {
+                    Color.grocartGreen
+                }
+            }
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 2)
         }
     }
 
@@ -407,7 +470,7 @@ struct StoreProductCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Image
                     ZStack(alignment: .topLeading) {
-                        AsyncImage(url: URL(string: product.imageUrl)) { phase in
+                        CachedAsyncImage(urlString: product.imageUrl) { phase in
                             switch phase {
                             case .success(let image):
                                 image.resizable()
@@ -422,7 +485,7 @@ struct StoreProductCard: View {
                                     .overlay(
                                         Image(systemName: "basket.fill")
                                             .font(.system(size: 24))
-                                            .foregroundColor(.grocartGreen.opacity(0.3))
+                                            .foregroundColor(.black.opacity(0.2))
                                     )
                             }
                         }
@@ -474,7 +537,7 @@ struct StoreProductCard: View {
 
                         Text(product.quantity)
                             .font(.system(size: 10))
-                            .foregroundColor(.grocartSecondary)
+                            .foregroundColor(.black)
                     }
                     .padding(.horizontal, 2)
                 }
@@ -487,11 +550,11 @@ struct StoreProductCard: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(product.formattedOfferPrice)
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.grocartGreen)
+                        .foregroundColor(.black)
 
                     Text(product.formattedOriginalPrice)
                         .font(.system(size: 10))
-                        .foregroundColor(.grocartSecondary)
+                        .foregroundColor(.black.opacity(0.55))
                         .strikethrough()
                         .opacity(product.isOnSale ? 1 : 0)
                 }
@@ -503,12 +566,12 @@ struct StoreProductCard: View {
                         Button(action: { cartManager.decrement(productId: product.id) }) {
                             Image(systemName: "minus")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.grocartGreen)
+                                .foregroundColor(.black)
                                 .frame(width: 26, height: 26)
                         }
                         Text("\(qty)")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.grocartPrimary)
+                            .foregroundColor(.black)
                             .frame(minWidth: 20)
                         Button(action: {
                             cartManager.add(product: product, categoryName: categoryName, store: store)
@@ -517,12 +580,11 @@ struct StoreProductCard: View {
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(width: 26, height: 26)
-                                .background(Color.grocartGreen)
+                                .background(Color.black)
                                 .clipShape(Circle())
                         }
                     }
-                    .background(Color.grocartSecondaryBackground)
-                    .cornerRadius(13)
+                    .glassPill(tint: .clear)
                 } else {
                     Button(action: {
                         guard product.isInStock else { return }
@@ -532,7 +594,7 @@ struct StoreProductCard: View {
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: 26, height: 26)
-                            .background(product.isInStock ? Color.grocartGreen : Color.gray)
+                            .background(product.isInStock ? Color.black : Color.gray)
                             .clipShape(Circle())
                     }
                     .disabled(!product.isInStock)
@@ -541,18 +603,6 @@ struct StoreProductCard: View {
             .padding(.horizontal, 2)
         }
         .padding(10)
-        .background(
-            product.isSpecialOrder
-                ? Color.orange.opacity(0.06)
-                : Color.grocartBackground
-        )
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    product.isSpecialOrder ? Color.orange.opacity(0.3) : Color.gray.opacity(0.12),
-                    lineWidth: 1
-                )
-        )
+        .glassCard(cornerRadius: 20, tint: .clear)
     }
 }

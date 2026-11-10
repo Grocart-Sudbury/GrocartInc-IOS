@@ -14,6 +14,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "CartRepo
 final class CartRepository: @unchecked Sendable {
 
     static let shared = CartRepository()
+    private static let decoder = JSONDecoder()
     private init() {}
 
     func fetchPricing(request: CartPricingRequest) async throws -> CartPricingResponse {
@@ -43,7 +44,7 @@ final class CartRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW RESPONSE: \(raw)")
             do {
-                return try JSONDecoder().decode(CartPricingResponse.self, from: data)
+                return try Self.decoder.decode(CartPricingResponse.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)

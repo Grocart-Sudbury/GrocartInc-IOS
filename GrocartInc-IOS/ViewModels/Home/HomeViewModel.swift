@@ -21,6 +21,9 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var stores: [Store] = []
     @Published var topProducts: [TopOrderedProduct] = []
+    // Category name per top product id — top products carry no category,
+    // but adding to the cart needs one.
+    @Published var topProductCategories: [Int: String] = [:]
     @Published var isLoadingStores: Bool = false
     @Published var isLoadingTopProducts: Bool = false
     @Published var isLoading: Bool = false
@@ -32,6 +35,7 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Dependencies
     private let storeRepository: StoreRepository
     private let orderRepository: OrderRepository
+    private let productRepository = ProductRepository.shared
 
     // MARK: - Init
     init(productRepository: ProductRepositoryProtocol? = nil) {
@@ -74,6 +78,26 @@ final class HomeViewModel: ObservableObject {
             // Silently fail — section just stays hidden
             topProducts = []
         }
+        // Category names for the add-to-cart button (top products carry none).
+        do {
+            let categories = try await productRepository.fetchCategories(storeId: storeId)
+            topProductCategories = Dictionary(
+                categories.flatMap { category in
+                    category.products.map { ($0.id, category.name) }
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            // New products and price/discount changes show as notifications.
+            if let store = stores.first(where: { $0.id == storeId }) {
+                NotificationManager.shared.checkProducts(
+                    categories.flatMap { category in
+                        category.products.map { (product: $0, store: store, categoryName: category.name) }
+                    }
+                )
+            }
+        } catch {
+            topProductCategories = [:]
+        }
         isLoadingTopProducts = false
     }
 
@@ -82,8 +106,11 @@ final class HomeViewModel: ObservableObject {
         isLoadingStores = true
         do {
             stores = try await storeRepository.fetchActiveStores(city: city, forceRefresh: forceRefresh)
+            errorMessage = nil
         } catch {
-            // Silently fail — stores list just stays empty
+            // Surface the failure instead of silently leaving an empty list:
+            // the Home UI shows this message with a Retry button.
+            errorMessage = (error as? NetworkError)?.errorDescription ?? error.localizedDescription
         }
         isLoadingStores = false
 

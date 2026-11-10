@@ -10,6 +10,7 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "UberRepo
 final class UberRepository: @unchecked Sendable {
 
     static let shared = UberRepository()
+    private static let decoder = JSONDecoder()
     private init() {}
 
     func fetchDeliveryQuote(dropoffAddress: String) async throws -> UberDeliveryQuoteResponse {
@@ -34,7 +35,7 @@ final class UberRepository: @unchecked Sendable {
             let raw = String(data: data, encoding: .utf8) ?? "nil"
             logger.debug("RAW: \(raw.prefix(500))")
             do {
-                return try JSONDecoder().decode(UberDeliveryQuoteResponse.self, from: data)
+                return try Self.decoder.decode(UberDeliveryQuoteResponse.self, from: data)
             } catch {
                 logger.error("DECODE ERROR: \(error)")
                 throw NetworkError.unknown(error)

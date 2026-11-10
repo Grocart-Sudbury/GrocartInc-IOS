@@ -118,9 +118,12 @@ private extension PromoCode {
 // MARK: - My Coupons View
 struct MyCouponsView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var scratchCardManager = ScratchCardManager.shared
     @State private var coupons: [Coupon] = []
     @State private var selectedCoupon: Coupon?
     @State private var showScratchCard = false
+    @State private var selectedScratchCard: ScratchCard?
+    @State private var showLocalScratchCard = false
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -147,7 +150,7 @@ struct MyCouponsView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 40)
-            } else if coupons.isEmpty {
+            } else if coupons.isEmpty && scratchCardManager.cards.isEmpty {
                 VStack(spacing: 16) {
                     Spacer()
 
@@ -175,17 +178,64 @@ struct MyCouponsView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 12) {
-                        ForEach(coupons) { coupon in
-                            CouponCard(coupon: coupon) {
-                                guard !coupon.isLocked else { return }
-                                selectedCoupon = coupon
-                                showScratchCard = true
+                        if !scratchCardManager.cards.isEmpty {
+                            HStack {
+                                Text("Scratch Cards")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(.grocartPrimary)
+                                Spacer()
+                                Text("Earned after every order")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.grocartSecondary)
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.top, 4)
+
+                            ForEach(scratchCardManager.cards) { card in
+                                ScratchCardRow(card: card) {
+                                    selectedScratchCard = card
+                                    showLocalScratchCard = true
+                                }
+                            }
+                        }
+
+                        if !coupons.isEmpty {
+                            if !scratchCardManager.cards.isEmpty {
+                                HStack {
+                                    Text("Promo Codes")
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(.grocartPrimary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.top, 8)
+                            }
+
+                            ForEach(coupons) { coupon in
+                                CouponCard(coupon: coupon) {
+                                    guard !coupon.isLocked else { return }
+                                    selectedCoupon = coupon
+                                    showScratchCard = true
+                                }
                             }
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
+            }
+
+            if showLocalScratchCard, let card = selectedScratchCard {
+                LocalScratchCardOverlay(
+                    card: card,
+                    onDismiss: {
+                        showLocalScratchCard = false
+                        selectedScratchCard = nil
+                    },
+                    onScratched: { ScratchCardManager.shared.markScratched(card) }
+                )
+                .transition(.opacity)
+                .zIndex(1)
             }
 
             if showScratchCard, let coupon = selectedCoupon {
@@ -311,7 +361,7 @@ struct CouponCard: View {
                             .foregroundColor(coupon.gradientColors.first ?? .grocartGreen)
                     } else if coupon.isScratched {
                         Text(coupon.code)
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(coupon.gradientColors.first ?? .grocartGreen)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -347,6 +397,119 @@ struct CouponCard: View {
                     if !coupon.isLocked {
                         withAnimation(.easeInOut(duration: 0.15)) { isPressed = true }
                     }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeInOut(duration: 0.15)) { isPressed = false }
+                }
+        )
+    }
+}
+
+// MARK: - Scratch Card Row (locally generated cards)
+struct ScratchCardRow: View {
+    let card: ScratchCard
+    let onTap: () -> Void
+    @State private var isPressed = false
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 0) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(
+                                LinearGradient(
+                                    colors: card.gradientColors,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 48, height: 48)
+
+                        if card.isUsed {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                        } else if card.isScratched {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        if card.isScratched {
+                            Text(card.displayDiscount)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.grocartPrimary)
+                            Text(card.displayDescription)
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                        } else {
+                            Text("Mystery Reward")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.grocartPrimary)
+                            Text("Tap to scratch & reveal")
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                VStack(spacing: 4) {
+                    if card.isUsed {
+                        Text("Used")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.grocartSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.gray.opacity(0.12))
+                            .cornerRadius(6)
+                        Text("Exp: \(card.formattedExpiry)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.grocartSecondary)
+                    } else if card.isScratched {
+                        if card.isWinner {
+                            Text(card.code)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(card.gradientColors.first ?? .grocartGreen)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    (card.gradientColors.first ?? .grocartGreen).opacity(0.1)
+                                )
+                                .cornerRadius(6)
+                        }
+                        Text("Exp: \(card.formattedExpiry)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.grocartSecondary)
+                    } else {
+                        Image(systemName: "hand.draw.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.orange)
+
+                        Text("Scratch")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color.grocartSecondaryBackground)
+            .cornerRadius(16)
+            .scaleEffect(isPressed ? 0.97 : 1.0)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    withAnimation(.easeInOut(duration: 0.15)) { isPressed = true }
                 }
                 .onEnded { _ in
                     withAnimation(.easeInOut(duration: 0.15)) { isPressed = false }
@@ -569,7 +732,7 @@ struct RewardContent: View {
                         .tracking(1.5)
                     
                     Text(coupon.code)
-                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(.grocartPrimary)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 10)
@@ -816,7 +979,7 @@ struct ConfettiView: View {
             ConfettiParticle(
                 x: CGFloat.random(in: 40...UIScreen.main.bounds.width - 40),
                 y: CGFloat.random(in: -200...(-20)),
-                color: colors.randomElement()!,
+                color: colors.randomElement() ?? .red,
                 size: CGFloat.random(in: 5...10),
                 rotation: Double.random(in: 0...360),
                 speed: CGFloat.random(in: 1.5...4.0),

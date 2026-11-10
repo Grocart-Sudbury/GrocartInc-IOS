@@ -13,9 +13,12 @@ private let logger = Logger(subsystem: "com.grocartinc.ios", category: "Checkout
 struct CheckoutView: View {
     @StateObject private var viewModel: CheckoutViewModel
     @ObservedObject private var cartManager = CartManager.shared
+    @ObservedObject private var pointsManager = PointsManager.shared
+    @ObservedObject private var scratchCardManager = ScratchCardManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var isPaymentActive = false
     @State private var showAddressSelector = false
+    @State private var showAddCard = false
 
     init(pricing: CartPricingResponse) {
         _viewModel = StateObject(wrappedValue: CheckoutViewModel(pricing: pricing))
@@ -39,8 +42,11 @@ struct CheckoutView: View {
                     if viewModel.orderType == .delivery {
                         promoCodeSection
                     }
+                    rewardsSection
+                    scratchCardSection
                     paymentSection
                     orderSummarySection
+                    placeOrderButton
                     Spacer().frame(height: 90)
                 }
                 .padding(.top, 8)
@@ -51,6 +57,34 @@ struct CheckoutView: View {
                     if let order = viewModel.pendingPaymentOrder {
                         PaymentView(order: order) { confirmedOrder in
                             logger.info("✅ PaymentView onPaymentSuccess — orderId=\(confirmedOrder.id)")
+                            // Record the sale in the on-device sales log.
+                            // This runs first, before settling points and
+                            // marking the scratch card used: those change
+                            // the points/scratch discounts to $0, and the
+                            // log must capture the amounts actually charged.
+                            if let logStore = viewModel.pendingLogStore {
+                                SalesLogManager.shared.recordOrder(
+                                    orderId: confirmedOrder.id,
+                                    trackingId: confirmedOrder.trackingId,
+                                    store: logStore,
+                                    items: viewModel.pendingLogItems,
+                                    orderType: viewModel.orderType.rawValue,
+                                    paymentMethod: viewModel.paymentMethod.rawValue,
+                                    subtotal: viewModel.pricing.subtotal,
+                                    tax: viewModel.pricing.tax,
+                                    deliveryCharge: viewModel.orderType == .delivery ? viewModel.effectiveShippingCost : 0,
+                                    tip: viewModel.orderType == .delivery ? viewModel.tipAmount : 0,
+                                    discount: viewModel.validatedDiscount + viewModel.pointsDiscount + viewModel.scratchCardDiscount,
+                                    total: viewModel.totalWithTip
+                                )
+                            }
+                            // Settle rewards: take 500 points if redeemed,
+                            // then award the points earned on this order's items.
+                            PointsManager.shared.settleOrder(earnedPoints: viewModel.pendingEarnedPoints, redeemed: viewModel.usePointsReward, orderLabel: "Order \(confirmedOrder.trackingId)")
+                            if let usedCard = viewModel.selectedScratchCard {
+                                ScratchCardManager.shared.markUsed(usedCard)
+                            }
+                            viewModel.earnedScratchCard = ScratchCardManager.shared.generateAfterOrder(orderLabel: "Order \(confirmedOrder.trackingId)")
                             isPaymentActive = false
                             viewModel.pendingPaymentOrder = nil
                             viewModel.placedOrder = confirmedOrder
@@ -84,10 +118,15 @@ struct CheckoutView: View {
         }
         .navigationTitle("Checkout")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom, spacing: 0) { placeOrderButton }
         .onAppear {
             if viewModel.orderType == .delivery {
                 Task { await viewModel.fetchSlotsForSelectedDate() }
+            }
+            Task { await viewModel.loadSavedCards() }
+        }
+        .sheet(isPresented: $showAddCard) {
+            StandaloneAddCardView(setAsDefault: viewModel.savedCards.isEmpty) {
+                Task { await viewModel.loadSavedCards() }
             }
         }
         .onChange(of: viewModel.selectedDate) { _ in
@@ -97,6 +136,8 @@ struct CheckoutView: View {
         }
         .onChange(of: viewModel.orderType) { type in
             if type == .delivery {
+                // Cash is pickup-only, so switching to delivery goes back to card.
+                viewModel.paymentMethod = .card
                 Task { await viewModel.fetchSlotsForSelectedDate() }
             }
         }
@@ -107,7 +148,7 @@ struct CheckoutView: View {
         .fullScreenCover(item: $viewModel.placedOrder, onDismiss: {
             dismiss()
         }) { order in
-            OrderConfirmationView(order: order)
+            OrderConfirmationView(order: order, pointsEarned: viewModel.pendingEarnedPoints, scratchCard: viewModel.earnedScratchCard)
         }
         .sheet(isPresented: $showAddressSelector) {
             AddressSelectorView(selectedAddress: $viewModel.selectedAddress)
@@ -294,6 +335,19 @@ struct CheckoutView: View {
 
             if let addr = viewModel.selectedAddress {
                 selectedAddressCard(addr)
+
+                // The distance from the store and the fee for it, once the
+                // address has been geocoded.
+                if let distance = viewModel.deliveryDistanceKm, let fee = viewModel.distanceBasedFee {
+                    HStack(spacing: 6) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 12))
+                        Text("\(DeliveryFeeCalculator.formattedDistance(distance)) from the store · Delivery fee \(DeliveryFeeCalculator.formattedFee(fee))")
+                            .font(.system(size: 13))
+                    }
+                    .foregroundColor(.grocartSecondary)
+                    .padding(.top, 2)
+                }
             } else {
                 emptyAddressPrompt
             }
@@ -548,11 +602,11 @@ struct CheckoutView: View {
             if viewModel.couponApplied {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.grocartGreen)
                         .font(.system(size: 14))
                     Text("Promo applied! You save \(String(format: "$%.2f", viewModel.validatedDiscount))")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.green)
+                        .foregroundColor(.grocartGreen)
                 }
             } else if let error = viewModel.couponError {
                 HStack(spacing: 6) {
@@ -567,27 +621,257 @@ struct CheckoutView: View {
         }
     }
 
+    // MARK: - Rewards Points
+    private var rewardsSection: some View {
+        card {
+            sectionHeader("Rewards", icon: "star.fill")
+
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.grocartGreen.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.grocartGreen)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(pointsManager.points) points")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.grocartPrimary)
+                    if pointsManager.canRedeem {
+                        Text("You can redeem $5 off this order")
+                            .font(.system(size: 12))
+                            .foregroundColor(.grocartSecondary)
+                    } else {
+                        Text("Only redeemable at 500 points")
+                            .font(.system(size: 12))
+                            .foregroundColor(.grocartSecondary)
+                    }
+                }
+                Spacer()
+            }
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.grocartGreen.opacity(0.15))
+                        .frame(height: 8)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.grocartGreen)
+                        .frame(width: geo.size.width * pointsManager.progressToReward, height: 8)
+                }
+            }
+            .frame(height: 8)
+
+            if pointsManager.canRedeem {
+                // 500+ points: choose to bank them or use them on this order.
+                Picker("Redeem points", selection: $viewModel.usePointsReward) {
+                    Text("Bank points").tag(false)
+                    Text("Use 500 pts").tag(true)
+                }
+                .pickerStyle(.segmented)
+
+                Text(viewModel.usePointsReward
+                     ? "500 points will be used for $5 off this order."
+                     : "Your points stay saved for a later order.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.grocartSecondary)
+            } else {
+                Text("You have \(pointsManager.points) points — \(pointsManager.pointsToNextReward) more to unlock $5 off. Earn 1 point for every $1 you spend.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.grocartSecondary)
+            }
+        }
+    }
+
+    // MARK: - Scratch Card
+    private var scratchCardSection: some View {
+        let usable = scratchCardManager.availableCards
+        let unscratched = scratchCardManager.cards.filter { !$0.isScratched && !$0.isExpired }
+        if usable.isEmpty && unscratched.isEmpty {
+            return AnyView(EmptyView())
+        }
+        return AnyView(
+            card {
+                sectionHeader("Scratch Card", icon: "ticket.fill")
+
+                if usable.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "hand.draw.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(.orange)
+                        Text("You have \(unscratched.count) scratch card\(unscratched.count == 1 ? "" : "s") to reveal — find them in My Coupons.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.grocartSecondary)
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(usable) { scratchCard in
+                            scratchCardOption(scratchCard)
+                        }
+                    }
+                    if viewModel.selectedScratchCard != nil {
+                        Text("This scratch card will be used on this order.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.grocartSecondary)
+                    }
+                }
+            }
+        )
+    }
+
+    private func scratchCardOption(_ scratchCard: ScratchCard) -> some View {
+        let isSelected = viewModel.selectedScratchCard?.id == scratchCard.id
+        let discount = ScratchCardManager.discount(for: scratchCard, subtotal: viewModel.pricing.subtotal)
+        return Button(action: {
+            viewModel.selectedScratchCard = isSelected ? nil : scratchCard
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(scratchCard.displayDiscount)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.grocartPrimary)
+                    Text("Save \(String(format: "$%.2f", discount)) on this order · Exp \(scratchCard.formattedExpiry)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary)
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.grocartGreen)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
+            .background(isSelected ? Color.grocartGreen.opacity(0.08) : Color.grocartBackground)
+            .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? Color.grocartGreen.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - 5. Payment
     private var paymentSection: some View {
         card {
             sectionHeader("Payment Method", icon: "creditcard.fill")
 
+            VStack(spacing: 10) {
+                paymentOption(.card)
+                // Cash is only available for pickup orders.
+                if viewModel.orderType == .pickup {
+                    paymentOption(.cash)
+                }
+            }
+
+            if viewModel.paymentMethod == .card {
+                savedCardsBlock
+            }
+
+            if viewModel.paymentMethod == .cash {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(.grocartGreen)
+                    Text("Pay in cash when you pick up your order at the store.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary)
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    // MARK: - Saved cards (Stripe) under the card option
+    private var savedCardsBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if viewModel.isLoadingCards {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if viewModel.savedCards.isEmpty {
+                Text("No saved card yet. Add one below — your card is entered through Stripe and never touches our servers.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.black.opacity(0.6))
+            } else {
+                ForEach(viewModel.savedCards) { card in
+                    HStack(spacing: 10) {
+                        Image(systemName: "creditcard.fill")
+                            .foregroundColor(.black)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(card.displayBrand) •• \(card.last4)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.black)
+                            Text("Expires \(card.formattedExpiry)")
+                                .font(.system(size: 12))
+                                .foregroundColor(.black.opacity(0.6))
+                        }
+                        Spacer()
+                        if card.isDefault {
+                            Text("Default")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.grocartGreen)
+                                .cornerRadius(10)
+                        }
+                    }
+                    .padding(12)
+                    .glassCard(cornerRadius: 14, tint: .clear)
+                }
+            }
+
+            Button {
+                showAddCard = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Add a card")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.black)
+                .cornerRadius(14)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private func paymentOption(_ method: CheckoutPaymentMethod) -> some View {
+        let isSelected = viewModel.paymentMethod == method
+        return Button(action: { viewModel.paymentMethod = method }) {
             HStack(spacing: 8) {
-                Image(systemName: "creditcard.fill")
+                Image(systemName: method.icon)
                     .font(.system(size: 15))
                     .foregroundColor(.grocartGreen)
-                Text("Credit / Debit Card")
+                Text(method.displayName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.grocartPrimary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.grocartGreen)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 14)
             .padding(.horizontal, 12)
-            .background(Color.grocartGreen.opacity(0.08))
+            .background(isSelected ? Color.grocartGreen.opacity(0.08) : Color.grocartBackground)
             .cornerRadius(12)
             .overlay(RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.grocartGreen.opacity(0.4), lineWidth: 1.5))
+                .stroke(isSelected ? Color.grocartGreen.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: 1.5))
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - 6. Order Summary
@@ -617,13 +901,19 @@ struct CheckoutView: View {
             pricingRow("Subtotal", viewModel.pricing.formattedSubtotal)
             pricingRow("Tax (HST 13%)", viewModel.pricing.formattedTax)
             if viewModel.orderType == .delivery {
-                pricingRow("Shipping", viewModel.pricing.formattedShipping)
+                pricingRow(viewModel.deliveryFeeLabel, viewModel.formattedEffectiveShipping)
                 if viewModel.pricing.serviceFee > 0 {
                     pricingRow("Service Fee", viewModel.pricing.formattedServiceFee)
                 }
             }
             if viewModel.validatedDiscount > 0 {
-                pricingRow("Discount", String(format: "-$%.2f", viewModel.validatedDiscount), color: .green)
+                pricingRow("Discount", String(format: "-$%.2f", viewModel.validatedDiscount), color: .grocartGreen)
+            }
+            if viewModel.pointsDiscount > 0 {
+                pricingRow("Points Discount", String(format: "-$%.2f", viewModel.pointsDiscount), color: .grocartGreen)
+            }
+            if viewModel.scratchCardDiscount > 0 {
+                pricingRow("Scratch Card", String(format: "-$%.2f", viewModel.scratchCardDiscount), color: .grocartGreen)
             }
             if viewModel.orderType == .delivery && viewModel.tipAmount > 0 {
                 pricingRow("Tip", String(format: "$%.2f", viewModel.tipAmount), color: .grocartGreen)
@@ -691,7 +981,6 @@ struct CheckoutView: View {
             .padding(.bottom, 12)
         }
         .disabled(viewModel.isPlacingOrder || !viewModel.isFormValid)
-        .background(Color.grocartBackground)
     }
 
     // MARK: - Date Helpers
