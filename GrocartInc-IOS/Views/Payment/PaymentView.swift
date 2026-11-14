@@ -16,9 +16,9 @@ struct PaymentView: View {
     @State private var showAddCard = false
     private let onPaymentSuccess: (OrderResponse) -> Void
 
-    init(order: OrderResponse, onPaymentSuccess: @escaping (OrderResponse) -> Void) {
+    init(order: OrderResponse, isStagingOrder: Bool = false, onPaymentSuccess: @escaping (OrderResponse) -> Void) {
         self.onPaymentSuccess = onPaymentSuccess
-        _viewModel = StateObject(wrappedValue: PaymentViewModel(order: order))
+        _viewModel = StateObject(wrappedValue: PaymentViewModel(order: order, isStagingOrder: isStagingOrder))
     }
 
     var body: some View {

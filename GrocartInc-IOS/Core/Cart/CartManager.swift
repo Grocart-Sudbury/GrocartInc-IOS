@@ -78,7 +78,7 @@ final class CartManager: ObservableObject {
 
     // MARK: - Build pricing request
 
-    func pricingRequest(couponCode: String? = nil) -> CartPricingRequest {
+    func pricingRequest(couponCode: String? = nil, pointsToRedeem: Int? = nil) -> CartPricingRequest {
         let city = LocationState.shared.cityName
         let cityCode = CartPricingRequest.cityCode(for: city)
 
@@ -96,6 +96,6 @@ final class CartManager: ObservableObject {
             )
         }
 
-        return CartPricingRequest(cart: requestItems, couponCode: couponCode, cityCode: cityCode)
+        return CartPricingRequest(cart: requestItems, couponCode: couponCode, cityCode: cityCode, pointsToRedeem: pointsToRedeem)
     }
 }

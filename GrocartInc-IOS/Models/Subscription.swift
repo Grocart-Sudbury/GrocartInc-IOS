@@ -7,6 +7,13 @@
 //  The backend owns recurring billing (it charges the saved card each
 //  cycle); the app creates and manages the subscription record.
 //
+//  Cancellation follows the standard rule every subscription service
+//  uses: cancelling ends the subscription at the end of the current
+//  period. The next scheduled delivery is the one that gets cancelled
+//  and the card is not charged again; a delivery already placed still
+//  arrives. The cancelled record is kept (status CANCELLED + the
+//  cancelled delivery date) so the customer can see what was cancelled.
+//
 
 import Foundation
 
@@ -79,6 +86,10 @@ struct Subscription: Codable, Identifiable, Hashable {
     let nextDeliveryDate: String?
     let status: SubscriptionStatus
     let createdAt: String?
+    /// The next delivery that was cancelled when the subscription was
+    /// cancelled — the renewal at the end of the current period.
+    /// Nil while the subscription is active.
+    let cancelledDeliveryDate: String?
 
     /// Local-only subscriptions use a negative id. They are created
     /// on-device when the backend could not confirm the subscription, so
@@ -93,6 +104,34 @@ struct Subscription: Codable, Identifiable, Hashable {
     var formattedNextDelivery: String {
         guard let raw = nextDeliveryDate, !raw.isEmpty else { return "—" }
         return Self.formatBackendDate(raw)
+    }
+
+    var formattedCancelledDelivery: String {
+        guard let raw = cancelledDeliveryDate, !raw.isEmpty else { return "—" }
+        return Self.formatBackendDate(raw)
+    }
+
+    /// A copy of this subscription as cancelled under the standard rule:
+    /// the next scheduled delivery (the renewal at the end of the current
+    /// period) is the one that gets cancelled; the record is kept so the
+    /// customer can see what was cancelled.
+    func cancelledCopy() -> Subscription {
+        Subscription(
+            id: id,
+            storeId: storeId,
+            storeName: storeName,
+            frequency: frequency,
+            fulfilment: fulfilment,
+            items: items,
+            paymentMethodId: paymentMethodId,
+            paymentCardLabel: paymentCardLabel,
+            addressId: addressId,
+            deliveryAddressLabel: deliveryAddressLabel,
+            nextDeliveryDate: nextDeliveryDate,
+            status: .cancelled,
+            createdAt: createdAt,
+            cancelledDeliveryDate: nextDeliveryDate
+        )
     }
 
     /// The backend sends dates as strings, either LocalDateTime
@@ -153,7 +192,7 @@ struct Subscription: Codable, Identifiable, Hashable {
         case id, storeId, storeName, frequency, fulfilment
         case items, paymentMethodId, paymentCardLabel
         case addressId, deliveryAddressLabel
-        case nextDeliveryDate, status, createdAt
+        case nextDeliveryDate, status, createdAt, cancelledDeliveryDate
     }
 
     init(
@@ -169,7 +208,8 @@ struct Subscription: Codable, Identifiable, Hashable {
         deliveryAddressLabel: String? = nil,
         nextDeliveryDate: String? = nil,
         status: SubscriptionStatus = .active,
-        createdAt: String? = nil
+        createdAt: String? = nil,
+        cancelledDeliveryDate: String? = nil
     ) {
         self.id = id
         self.storeId = storeId
@@ -184,6 +224,7 @@ struct Subscription: Codable, Identifiable, Hashable {
         self.nextDeliveryDate = nextDeliveryDate
         self.status = status
         self.createdAt = createdAt
+        self.cancelledDeliveryDate = cancelledDeliveryDate
     }
 
     init(from decoder: Decoder) throws {
@@ -205,6 +246,7 @@ struct Subscription: Codable, Identifiable, Hashable {
         nextDeliveryDate = try c.decodeIfPresent(String.self, forKey: .nextDeliveryDate)
         status = try c.decodeIfPresent(SubscriptionStatus.self, forKey: .status) ?? .active
         createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+        cancelledDeliveryDate = try c.decodeIfPresent(String.self, forKey: .cancelledDeliveryDate)
     }
 }
 

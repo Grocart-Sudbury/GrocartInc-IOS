@@ -53,11 +53,15 @@ final class PaymentViewModel: ObservableObject {
 
     // MARK: - Dependencies
     let order: OrderResponse
+    /// True when the order was placed through the staging points API —
+    /// the charge and 3DS confirm then go to staging too.
+    let isStagingOrder: Bool
     private let repository = PaymentRepository.shared
 
-    init(order: OrderResponse) {
+    init(order: OrderResponse, isStagingOrder: Bool = false) {
         self.order = order
-        logger.info("🆕 PaymentViewModel init — orderId=\(order.id) total=\(order.formattedTotal)")
+        self.isStagingOrder = isStagingOrder
+        logger.info("🆕 PaymentViewModel init — orderId=\(order.id) total=\(order.formattedTotal) staging=\(isStagingOrder)")
     }
 
     // MARK: - Load Saved Cards
@@ -111,7 +115,7 @@ final class PaymentViewModel: ObservableObject {
                 let response = try await repository.chargeCard(ChargeRequest(
                     orderId: order.id,
                     paymentMethodId: card.id
-                ))
+                ), url: isStagingOrder ? APIConfig.Points.charge : APIConfig.Payment.charge)
                 logger.info("✅ chargeCard() response — success=\(response.success) requiresAction=\(response.requiresAction.map(String.init) ?? "nil") status=\(response.status)")
                 handleChargeResponse(response)
             } catch let error as NetworkError {
@@ -136,7 +140,7 @@ final class PaymentViewModel: ObservableObject {
                 let response = try await repository.confirmPayment(ConfirmPaymentRequest(
                     paymentIntentId: paymentIntentId,
                     orderId: orderId
-                ))
+                ), url: isStagingOrder ? APIConfig.Points.confirm : APIConfig.Payment.confirm)
                 logger.info("✅ confirmAfterAction() response — success=\(response.success) status=\(response.status)")
                 if response.success {
                     logger.info("  → 3DS confirm success, setting paymentComplete")

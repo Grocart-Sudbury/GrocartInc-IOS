@@ -9,16 +9,27 @@ import SwiftUI
 
 struct OrderConfirmationView: View {
     let order: OrderResponse
-    let pointsEarned: Int
+    /// Points redeemed on this order (server value from the order
+    /// response). Points earned land when the payment succeeds.
+    let pointsRedeemed: Int
     let scratchCard: ScratchCard?
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var scratchCardManager = ScratchCardManager.shared
     @State private var showScratchCard = false
 
-    init(order: OrderResponse, pointsEarned: Int = 0, scratchCard: ScratchCard? = nil) {
+    init(order: OrderResponse, pointsRedeemed: Int = 0, scratchCard: ScratchCard? = nil) {
         self.order = order
-        self.pointsEarned = pointsEarned
+        self.pointsRedeemed = pointsRedeemed
         self.scratchCard = scratchCard
+    }
+
+    /// The dollar value of the redeemed points, as the server priced
+    /// it (falls back to the server rules when the order has none).
+    private var pointsRedeemedValue: String {
+        if let discount = order.pointsDiscount {
+            return String(format: "$%.2f", discount)
+        }
+        return String(format: "$%.2f", Double(pointsRedeemed) / Double(PointsManager.shared.rules.pointsPerDollar))
     }
 
     /// The earned card as it stands now in the manager (so the row
@@ -132,10 +143,17 @@ struct OrderConfirmationView: View {
                                   value: order.formattedTotal,
                                   valueColor: .grocartGreen)
                         Divider().padding(.horizontal, 16)
+                        if pointsRedeemed > 0 {
+                            detailRow(icon: "star.fill",
+                                      label: "Points redeemed",
+                                      value: "−\(pointsRedeemed) pts (\(pointsRedeemedValue))",
+                                      valueColor: .grocartGreen)
+                            Divider().padding(.horizontal, 16)
+                        }
                         detailRow(icon: "star.fill",
-                                  label: "Points earned",
-                                  value: "+\(pointsEarned) pts",
-                                  valueColor: .grocartGreen)
+                                  label: "Points",
+                                  value: "Points for this order will be added when your payment succeeds",
+                                  valueColor: .grocartSecondary)
                     }
                     .background(Color.grocartSecondaryBackground.opacity(0.6))
                     .cornerRadius(16)

@@ -187,23 +187,27 @@ struct ProductDetailView: View {
 
     // MARK: - Add to Cart Bar
 
+    // The black Add to Cart box is ALWAYS visible. When the item is
+    // already in the cart, the stepper sits to its left for quick
+    // −/+ changes; tapping Add to Cart adds one more and opens the
+    // quantity popup (same as when the cart is empty).
     private var addToCartBar: some View {
         let qty = cartManager.count(for: product.id)
-        return Group {
+        return HStack(spacing: 12) {
             if qty > 0 {
                 HStack(spacing: 0) {
                     Button(action: { cartManager.decrement(productId: product.id) }) {
                         Image(systemName: "minus")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.black)
-                            .frame(width: 52, height: 52)
+                            .frame(width: 44, height: 56)
                     }
 
                     Button(action: { showQuantityPopup = true }) {
                         Text("\(qty)")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.black)
-                            .frame(minWidth: 40)
+                            .frame(minWidth: 28)
                     }
 
                     Button(action: {
@@ -212,31 +216,28 @@ struct ProductDetailView: View {
                         Image(systemName: "plus")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 36, height: 36)
                             .background(Color.black)
                             .clipShape(Circle())
                             .padding(.trailing, 6)
                     }
                 }
                 .glassPill(tint: .clear)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-            } else {
-                Button(action: {
-                    guard product.isInStock else { return }
-                    cartManager.add(product: product, categoryName: categoryName, store: store)
-                    showQuantityPopup = true
-                }) {
-                    Text(product.isInStock ? "Add to Cart" : "Out of Stock")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .buttonStyle(.blackPrimary)
-                .disabled(!product.isInStock)
-                .opacity(product.isInStock ? 1 : 0.6)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
             }
+
+            Button(action: {
+                guard product.isInStock else { return }
+                cartManager.add(product: product, categoryName: categoryName, store: store)
+                showQuantityPopup = true
+            }) {
+                Text(product.isInStock ? "Add to Cart" : "Out of Stock")
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .buttonStyle(.blackPrimary)
+            .disabled(!product.isInStock)
+            .opacity(product.isInStock ? 1 : 0.6)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
     }
 }

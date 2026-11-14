@@ -95,8 +95,11 @@ final class OrderRepository: @unchecked Sendable {
         }
     }
 
-    func placeOrder(_ request: OrderRequest) async throws -> OrderResponse {
-        logger.info("POST /orders — store:\(request.storeId) items:\(request.items.count)")
+    /// - Parameter url: order endpoint. Defaults to the production
+    ///   endpoint; pass `APIConfig.Points.placeOrder` when points are
+    ///   applied, so only that call goes to staging.
+    func placeOrder(_ request: OrderRequest, url: String = APIConfig.Orders.place) async throws -> OrderResponse {
+        logger.info("POST \(url) — store:\(request.storeId) items:\(request.items.count)")
 
         let bodyData = try JSONEncoder().encode(request)
         guard let params = try JSONSerialization.jsonObject(with: bodyData) as? [String: Any] else {
@@ -105,7 +108,7 @@ final class OrderRepository: @unchecked Sendable {
         }
 
         let task = Session.authenticated.request(
-            APIConfig.Orders.place,
+            url,
             method: .post,
             parameters: params,
             encoding: JSONEncoding.default
@@ -132,6 +135,15 @@ final class OrderRepository: @unchecked Sendable {
             if let data = response.data,
                let errResponse = try? Self.decoder.decode(APIErrorResponse.self, from: data) {
                 throw NetworkError.serverError(errResponse.displayMessage)
+            }
+            // The points API returns validation failures as HTTP 400
+            // with a PLAIN-TEXT body (not JSON) — surface that text
+            // as the error, so the customer sees the server's reason.
+            if response.response?.statusCode == 400 {
+                let message = body.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !message.isEmpty && message != "nil" {
+                    throw NetworkError.serverError(message)
+                }
             }
             if response.response?.statusCode == 401 { throw NetworkError.unauthorized }
             throw NetworkError.unknown(afError)

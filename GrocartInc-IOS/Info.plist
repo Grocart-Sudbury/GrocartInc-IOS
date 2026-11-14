@@ -22,6 +22,15 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<!-- TEMPORARY, TEST-ONLY: allows the plain-http staging loyalty API (147.93.114.66) while it is tested. Remove this exception before any production or App Store build. -->
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>147.93.114.66</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>GroCart uses your location to show delivery availability in your area.</string>

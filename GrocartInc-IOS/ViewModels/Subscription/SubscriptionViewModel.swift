@@ -26,8 +26,10 @@ final class SubscriptionViewModel: ObservableObject {
     func cancel(_ subscription: Subscription) async {
         errorMessage = nil
         do {
-            try await SubscriptionRepository.shared.cancel(id: subscription.id)
-            subscriptions.removeAll { $0.id == subscription.id }
+            let cancelled = try await SubscriptionRepository.shared.cancel(subscription)
+            if let index = subscriptions.firstIndex(where: { $0.id == subscription.id }) {
+                subscriptions[index] = cancelled
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

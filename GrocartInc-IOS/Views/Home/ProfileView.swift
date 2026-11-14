@@ -17,6 +17,7 @@ struct ProfileView: View {
     @State private var isDeletingAccount = false
     @State private var showLogin = false
     @State private var showSignUp = false
+    @State private var showPointsHistory = false
 
     private var user: User? { sessionManager.currentUser }
 
@@ -82,8 +83,20 @@ struct ProfileView: View {
                         .padding(.top, 10)
                         .padding(.bottom, 10)
 
-                        // Points — tap to see the points earned per purchase
-                        NavigationLink(destination: PointsHistoryView()) {
+                        // Points — tap to see the points earned per purchase.
+                        // The link is driven by state on purpose: tapping first
+                        // refreshes the balance, THEN pushes. Refreshing while
+                        // the push is in flight pops this screen straight back
+                        // to Profile, so the refresh must finish first.
+                        NavigationLink(destination: PointsHistoryView(), isActive: $showPointsHistory) {
+                            EmptyView()
+                        }
+                        Button {
+                            Task {
+                                await pointsManager.refresh()
+                                showPointsHistory = true
+                            }
+                        } label: {
                             VStack(alignment: .leading, spacing: 12) {
                             HStack(spacing: 10) {
                                 ZStack {
@@ -101,10 +114,13 @@ struct ProfileView: View {
                                     Text("\(pointsManager.points) points")
                                         .font(.system(size: 20, weight: .bold))
                                         .foregroundColor(.grocartPrimary)
+                                    Text("Worth \(pointsManager.formattedBalanceValue)")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.grocartSecondary)
                                 }
                                 Spacer()
                                 if pointsManager.canRedeem {
-                                    Text("$5 OFF")
+                                    Text("\(pointsManager.formattedBalanceValue) OFF")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 10)
@@ -117,30 +133,25 @@ struct ProfileView: View {
                                     .foregroundColor(.grocartSecondary)
                             }
 
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.grocartGreen.opacity(0.15))
-                                        .frame(height: 8)
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.grocartGreen)
-                                        .frame(width: geo.size.width * pointsManager.progressToReward, height: 8)
-                                }
-                            }
-                            .frame(height: 8)
+                            // Plain ProgressView: a GeometryReader inside a
+                            // tappable label can swallow the tap.
+                            ProgressView(value: pointsManager.progressToReward)
+                                .progressViewStyle(.linear)
+                                .tint(Color.grocartGreen)
+                                .frame(height: 8)
 
                             Text(pointsManager.canRedeem
-                                 ? "You can redeem $5 off your next order at checkout."
-                                 : "\(pointsManager.pointsToNextReward) more points to unlock $5 off. Earn 1 point per $1 spent.")
+                                 ? "You can redeem \(pointsManager.formattedBalanceValue) off your next order at checkout."
+                                 : "\(pointsManager.pointsToNextReward) more points to unlock \(pointsManager.formattedMinRedemptionValue) off. Earn \(pointsManager.rules.earnPointsPerDollar) point per $1 spent.")
                                 .font(.system(size: 12))
                                 .foregroundColor(.grocartSecondary)
-                        }
-                        .padding(16)
-                        .background(Color.grocartSecondaryBackground)
-                        .cornerRadius(16)
-                        .padding(.horizontal, 20)
+                            }
+                            .padding(16)
+                            .background(Color.grocartSecondaryBackground)
+                            .cornerRadius(16)
                         }
                         .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
 
                         // Menu Items
                         VStack(spacing: 2) {

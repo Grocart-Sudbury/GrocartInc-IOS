@@ -17,10 +17,34 @@ import Foundation
 struct APIConfig {
     
     // MARK: - Base URL
-  
-   // static let baseURL = "http://147.93.114.66:9092/api"
-    //static let baseURL = "http://localhost:9091/api"
-  static let baseURL = "https://api.grocartinc.ca/api"
+
+    // STAGING TESTING (2026-11-13, Probby: "make the app work in
+    // staging"): the whole app — sign-up, stores, products, cart,
+    // orders, cards — talks to the staging backend. Staging has its
+    // own database, so accounts made here do NOT exist on production
+    // and vice versa. To go back to production, swap the two lines
+    // below and Run again. Do NOT ship a staging build.
+    static let baseURL = "http://147.93.114.66:9092/api"
+    //static let baseURL = "https://api.grocartinc.ca/api"
+
+    // MARK: - Points (TEST-ONLY staging)
+    //
+    // The loyalty API (GET /customer/points, POST /cart/pricing with
+    // pointsToRedeem, POST /orders with pointsToRedeem) lives on
+    // STAGING only until it ships to production. While the whole app
+    // is on staging these are the same server as `baseURL` above.
+    // When the app goes back to production, point `pointsBaseURL` at
+    // `baseURL` only once the loyalty API has shipped to production.
+    static let pointsStagingBaseURL = "http://147.93.114.66:9092/api"
+    static let pointsBaseURL = pointsStagingBaseURL
+
+    struct Points {
+        static let summary = "\(pointsBaseURL)/customer/points"
+        static let pricing = "\(pointsBaseURL)/cart/pricing"
+        static let placeOrder = "\(pointsBaseURL)/orders"
+        static let charge = "\(pointsBaseURL)/payment/charge"
+        static let confirm = "\(pointsBaseURL)/payment/confirm"
+    }
    
     
     // MARK: - Auth Endpoints
@@ -109,6 +133,13 @@ struct APIConfig {
     }
 
     // MARK: - Stripe
+    // STAGING GAP (2026-11-13): this is still the LIVE publishable key.
+    // Staging's backend uses Stripe TEST keys, so adding a card or
+    // paying by card on staging will fail (live key + test-mode setup
+    // intent do not mix). Everything else on staging works. To fix
+    // card payments on staging, replace this with staging's TEST
+    // publishable key from the Stripe dashboard and flip it back to
+    // this live key before any production build.
     static let stripePublishableKey = "pk_live_51SLbLoBz4P6OLwsVYvrJhUb1KonoFVDivJjyIfLmiw3WgNZGYOqPXH8rFCpseI0hAjCEdEoIlOGC6XWrx0YdI51W00XTseX3jc"
 
     // MARK: - Timeouts

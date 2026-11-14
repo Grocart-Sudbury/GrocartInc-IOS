@@ -149,11 +149,51 @@ struct OrderRequest: Encodable {
     let tipAmount: Double
     let total: Double
     let couponCode: String?
+    /// Points to redeem on this order. Nil means no points. When set,
+    /// couponCode must be empty and bundleIds empty — the server
+    /// rejects points combined with coupons or bundles. A nil value is
+    /// omitted from the JSON.
+    /// (No default here: a `let` with a default cannot be assigned
+    /// again in init — the default lives on the init parameter.)
+    let pointsToRedeem: Int?
     // Payment
     let paymentMethod: String
     let bundleIds: [Int]
     // Items
     let items: [OrderItemRequest]
+
+    /// Explicit init: the memberwise init did not pick up the defaulted
+    /// pointsToRedeem (the compiler rejected it as an extra argument),
+    /// so the initializer is spelled out.
+    init(orderType: String, storeId: Int, firstName: String, lastName: String, email: String, phone: String, address: String?, city: String?, province: String?, postalCode: String?, deliveryNotes: String?, preferredDeliveryDate: String?, preferredDeliveryTimeSlot: String?, preferredPickupDate: String?, preferredPickupTimeSlot: String?, subtotal: Double, tax: Double, shippingCost: Double, serviceFee: Double, discount: Double, tipAmount: Double, total: Double, couponCode: String?, pointsToRedeem: Int? = nil, paymentMethod: String, bundleIds: [Int], items: [OrderItemRequest]) {
+        self.orderType = orderType
+        self.storeId = storeId
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.phone = phone
+        self.address = address
+        self.city = city
+        self.province = province
+        self.postalCode = postalCode
+        self.deliveryNotes = deliveryNotes
+        self.preferredDeliveryDate = preferredDeliveryDate
+        self.preferredDeliveryTimeSlot = preferredDeliveryTimeSlot
+        self.preferredPickupDate = preferredPickupDate
+        self.preferredPickupTimeSlot = preferredPickupTimeSlot
+        self.subtotal = subtotal
+        self.tax = tax
+        self.shippingCost = shippingCost
+        self.serviceFee = serviceFee
+        self.discount = discount
+        self.tipAmount = tipAmount
+        self.total = total
+        self.couponCode = couponCode
+        self.pointsToRedeem = pointsToRedeem
+        self.paymentMethod = paymentMethod
+        self.bundleIds = bundleIds
+        self.items = items
+    }
 
     struct OrderItemRequest: Encodable {
         let productId: Int
@@ -183,6 +223,15 @@ struct OrderResponse: Decodable {
     let preferredPickupDate: String?
     let preferredPickupTimeSlot: String?
     let createdAt: String
+    /// Loyalty fields from the backend (staging). All optional so
+    /// responses from production, which does not have them yet, still
+    /// decode. `pointsEarned` is null until the payment succeeds.
+    let loyaltyEligible: Bool? = nil
+    let pointsRedeemed: Int? = nil
+    let pointsDiscount: Double? = nil
+    let pointsRedemptionReturned: Bool? = nil
+    let pointsEarned: Int? = nil
+    let pointsEarnedReversed: Int? = nil
 
     var isPickup: Bool { orderType == OrderType.pickup.rawValue }
 

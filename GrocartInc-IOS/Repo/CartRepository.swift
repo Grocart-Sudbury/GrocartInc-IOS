@@ -17,8 +17,11 @@ final class CartRepository: @unchecked Sendable {
     private static let decoder = JSONDecoder()
     private init() {}
 
-    func fetchPricing(request: CartPricingRequest) async throws -> CartPricingResponse {
-        logger.info("POST cart/pricing — \(request.cart.count) item(s), cityCode: \(request.cityCode)")
+    /// - Parameter url: pricing endpoint. Defaults to the production
+    ///   endpoint; pass `APIConfig.Points.pricing` when points are
+    ///   applied, so only that call goes to staging.
+    func fetchPricing(request: CartPricingRequest, url: String = APIConfig.Cart.pricing) async throws -> CartPricingResponse {
+        logger.info("POST \(url) — \(request.cart.count) item(s), cityCode: \(request.cityCode)")
 
         // Encode struct → Data → [String: Any] to avoid JSONParameterEncoder's Sendable requirement
         let bodyData = try JSONEncoder().encode(request)
@@ -28,7 +31,7 @@ final class CartRepository: @unchecked Sendable {
         }
 
         let task = Session.authenticated.request(
-            APIConfig.Cart.pricing,
+            url,
             method: .post,
             parameters: params,
             encoding: JSONEncoding.default

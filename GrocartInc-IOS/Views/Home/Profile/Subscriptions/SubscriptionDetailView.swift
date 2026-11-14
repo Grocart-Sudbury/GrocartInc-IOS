@@ -3,7 +3,12 @@
 //  GrocartInc-IOS
 //
 //  One subscription: its items, schedule, fulfilment, billing card,
-//  and next delivery. Cancel removes it.
+//  and next delivery. Cancel follows the standard rule every
+//  subscription service uses: it ends the subscription at the end of
+//  the current period — the next scheduled delivery is cancelled and
+//  the card is not charged again; a delivery already placed still
+//  arrives. The cancelled record stays visible with the date that
+//  was cancelled.
 //
 
 import SwiftUI
@@ -27,6 +32,10 @@ struct SubscriptionDetailView: View {
 
                     if subscription.isLocalOnly {
                         localOnlyNote
+                    }
+
+                    if subscription.status == .cancelled {
+                        cancelledNote
                     }
 
                     scheduleSection
@@ -68,7 +77,11 @@ struct SubscriptionDetailView: View {
                 Task { await cancel() }
             }
         } message: {
-            Text("You will not be billed again for \(subscription.storeName). This cannot be undone.")
+            if let next = subscription.nextDeliveryDate, !next.isEmpty {
+                Text("Cancelling ends your subscription at the end of the current period. Your delivery on \(subscription.formattedNextDelivery) is cancelled and your card won't be charged again. Any delivery already on its way will still arrive.")
+            } else {
+                Text("You won't be billed again for \(subscription.storeName). Any delivery already on its way will still arrive.")
+            }
         }
         .alert("Something went wrong", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }
@@ -104,6 +117,26 @@ struct SubscriptionDetailView: View {
         }
     }
 
+    private var cancelledNote: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundColor(.red)
+            Text(cancelledMessage)
+                .font(.system(size: 13))
+                .foregroundColor(.red)
+        }
+        .padding(14)
+        .background(Color.red.opacity(0.08))
+        .cornerRadius(14)
+    }
+
+    private var cancelledMessage: String {
+        if let date = subscription.cancelledDeliveryDate, !date.isEmpty {
+            return "Cancelled — your delivery on \(subscription.formattedCancelledDelivery) was cancelled. No further deliveries or charges."
+        }
+        return "Cancelled — no further deliveries or charges."
+    }
+
     private var localOnlyNote: some View {
         HStack(spacing: 8) {
             Image(systemName: "iphone")
@@ -129,7 +162,11 @@ struct SubscriptionDetailView: View {
             } else if subscription.fulfilment == .pickup {
                 detailRow(label: "Pickup at", value: subscription.storeName)
             }
-            detailRow(label: "Next delivery", value: subscription.formattedNextDelivery)
+            if subscription.status == .cancelled {
+                detailRow(label: "Cancelled delivery", value: subscription.formattedCancelledDelivery)
+            } else {
+                detailRow(label: "Next delivery", value: subscription.formattedNextDelivery)
+            }
         }
         .padding(16)
         .glassCard(cornerRadius: 16, tint: .clear)

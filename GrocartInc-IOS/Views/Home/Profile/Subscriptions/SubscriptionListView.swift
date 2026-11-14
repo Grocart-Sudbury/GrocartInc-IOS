@@ -114,9 +114,15 @@ struct SubscriptionListView: View {
                     .foregroundColor(.black.opacity(0.6))
                 Text("·")
                     .foregroundColor(.black.opacity(0.4))
-                Text("Next delivery \(subscription.formattedNextDelivery)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.black.opacity(0.6))
+                if subscription.status == .cancelled {
+                    Text("Delivery on \(subscription.formattedCancelledDelivery) cancelled")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.black.opacity(0.6))
+                } else {
+                    Text("Next delivery \(subscription.formattedNextDelivery)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.black.opacity(0.6))
+                }
                 Spacer()
                 Text(subscription.status.displayName)
                     .font(.system(size: 11, weight: .bold))

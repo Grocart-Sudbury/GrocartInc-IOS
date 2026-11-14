@@ -65,10 +65,12 @@ final class PaymentRepository: @unchecked Sendable {
     }
 
     // MARK: - Charge Saved Card
-    func chargeCard(_ request: ChargeRequest) async throws -> ChargeResponse {
-        logger.info("POST /payment/charge — orderId:\(request.orderId) pmId:\(request.paymentMethodId)")
+    /// - Parameter url: charge endpoint. Defaults to production; pass
+    ///   `APIConfig.Points.charge` when the order was placed on staging.
+    func chargeCard(_ request: ChargeRequest, url: String = APIConfig.Payment.charge) async throws -> ChargeResponse {
+        logger.info("POST \(url) — orderId:\(request.orderId) pmId:\(request.paymentMethodId)")
         let response = await Session.authenticated
-            .request(APIConfig.Payment.charge, method: .post,
+            .request(url, method: .post,
                      parameters: try encodeToParams(request), encoding: JSONEncoding.default)
             .validate(statusCode: 200..<300)
             .serializingData()
@@ -77,11 +79,13 @@ final class PaymentRepository: @unchecked Sendable {
     }
 
     // MARK: - Confirm Payment After 3DS
-    func confirmPayment(_ request: ConfirmPaymentRequest) async throws -> ConfirmPaymentResponse {
-        logger.info("POST /payment/confirm — piId:\(request.paymentIntentId)")
+    /// - Parameter url: confirm endpoint. Defaults to production; pass
+    ///   `APIConfig.Points.confirm` when the order was placed on staging.
+    func confirmPayment(_ request: ConfirmPaymentRequest, url: String = APIConfig.Payment.confirm) async throws -> ConfirmPaymentResponse {
+        logger.info("POST \(url) — piId:\(request.paymentIntentId)")
         // Note: /payment/confirm does not require auth per the API docs
         let response = await Session.default
-            .request(APIConfig.Payment.confirm, method: .post,
+            .request(url, method: .post,
                      parameters: try encodeToParams(request), encoding: JSONEncoding.default)
             .validate(statusCode: 200..<300)
             .serializingData()

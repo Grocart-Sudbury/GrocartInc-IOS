@@ -108,13 +108,35 @@ final class CheckoutViewModel: ObservableObject {
         isLoadingCards = false
     }
 
-    // MARK: - Rewards Points
-    @Published var usePointsReward = false
-    /// Points this order will earn, from the items (each item's price
-    /// rounded to the nearest $1, x quantity). Computed when the order is
-    /// placed, before the cart is cleared; awarded only if the payment
-    /// succeeds.
-    var pendingEarnedPoints: Int = 0
+    // MARK: - Rewards Points (server-driven)
+    /// Points the customer wants to redeem on this order. 0 = none.
+    @Published var pointsToRedeem: Int = 0
+    /// The points amount typed in the rewards field.
+    @Published var pointsInput: String = ""
+    @Published var isApplyingPoints = false
+    /// The server's own message about the points on this quote
+    /// (e.g. why a redemption was rejected). Shown verbatim.
+    @Published var pointsMessage: String? = nil
+    /// Whether this order is placed through the staging points API
+    /// (true when points are applied). Threaded to the payment step.
+    @Published var placedOrderIsStaging = false
+
+    /// Whether points are applied to this order.
+    var pointsApplied: Bool { pointsToRedeem > 0 }
+
+    /// The most points this order can take: the whole balance. Above the
+    /// 100-point minimum a customer may redeem any amount up to what they
+    /// have; the server only spends what the order needs and the rest
+    /// stays banked.
+    var maxRedeemablePoints: Int {
+        PointsManager.shared.points
+    }
+
+    /// Points can be redeemed when the balance meets the server's
+    /// minimum (100 points). There is no minimum order.
+    var canRedeemPoints: Bool {
+        maxRedeemablePoints >= PointsManager.shared.rules.minRedeemPoints
+    }
 
     // MARK: - Scratch Card
     /// The scratch card the customer chose to apply to this order.
@@ -200,24 +222,20 @@ final class CheckoutViewModel: ObservableObject {
     }
 
     // MARK: - Computed
-    /// $5 off when the customer redeems 500 points. Capped so the total
-    /// never goes below $0.
-    var pointsDiscount: Double {
-        guard usePointsReward && PointsManager.shared.canRedeem else { return 0 }
-        let base: Double
-        if orderType == .pickup {
-            base = pricing.subtotal + pricing.tax - validatedDiscount
-        } else {
-            base = effectiveDeliveryTotal - validatedDiscount + tipAmount
-        }
-        return min(PointsManager.redeemValue, max(0, base))
-    }
+    /// The dollar value of the points on this quote, as the server
+    /// priced it. It is ALREADY included in pricing.discount and
+    /// pricing.total — display only, never subtracted again.
+    var pointsDiscount: Double { pricing.pointsDiscount }
 
     var totalWithTip: Double {
+        // pricing.total / pricing.discount already hold the coupon and
+        // points discounts the server applied (refreshPricing always
+        // sends both), so they are never subtracted again here — only
+        // the on-device scratch card discount is applied on top.
         if orderType == .pickup {
-            return pricing.subtotal + pricing.tax - validatedDiscount - pointsDiscount - scratchCardDiscount
+            return pricing.subtotal + pricing.tax - pricing.discount - scratchCardDiscount
         }
-        return effectiveDeliveryTotal - validatedDiscount - pointsDiscount - scratchCardDiscount + tipAmount
+        return effectiveDeliveryTotal - scratchCardDiscount + tipAmount
     }
     var formattedTotal: String { String(format: "$%.2f", totalWithTip) }
 
@@ -226,11 +244,13 @@ final class CheckoutViewModel: ObservableObject {
     var scratchCardDiscount: Double {
         guard let card = selectedScratchCard, card.isUsable else { return 0 }
         let raw = ScratchCardManager.discount(for: card, subtotal: pricing.subtotal)
+        // pricing.discount already nets the coupon + points discounts,
+        // so the remaining payable base needs no further subtraction.
         let base: Double
         if orderType == .pickup {
-            base = pricing.subtotal + pricing.tax - validatedDiscount - pointsDiscount
+            base = pricing.subtotal + pricing.tax - pricing.discount
         } else {
-            base = effectiveDeliveryTotal - validatedDiscount - pointsDiscount + tipAmount
+            base = effectiveDeliveryTotal + tipAmount
         }
         return min(raw, max(0, base))
     }
@@ -348,8 +368,117 @@ final class CheckoutViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Rewards Points
+
+    /// Applies the points amount typed in the rewards field. Validates
+    /// against the server rules first, then re-prices the cart on the
+    /// staging points endpoint — the server is the source of truth
+    /// for whether the redemption applies.
+    func applyPoints() {
+        let amount = Int(pointsInput.trimmingCharacters(in: .whitespaces)) ?? 0
+        pointsMessage = nil
+        let manager = PointsManager.shared
+        let rules = manager.rules
+        guard amount > 0 else {
+            pointsMessage = "Enter how many points to use."
+            return
+        }
+        guard amount <= manager.points else {
+            pointsMessage = "You only have \(manager.points) points available."
+            return
+        }
+        guard amount >= rules.minRedeemPoints else {
+            pointsMessage = "The minimum redemption is \(rules.minRedeemPoints) points."
+            return
+        }
+        pointsToRedeem = amount
+        // Points stack with coupons and scratch cards: the coupon
+        // discount applies first and points cover the remaining
+        // subtotal (server-side). Nothing is cleared here.
+        Task { await refreshPricing() }
+    }
+
+    /// Removes points from this order and re-prices the cart.
+    /// Coupons and scratch cards stay applied.
+    func clearPoints() {
+        guard pointsApplied else {
+            pointsToRedeem = 0
+            pointsInput = ""
+            pointsMessage = nil
+            return
+        }
+        pointsToRedeem = 0
+        pointsInput = ""
+        pointsMessage = nil
+        Task { await refreshPricing() }
+    }
+
+    /// Fills in the largest amount this order can take and applies it.
+    func useMaxPoints() {
+        pointsInput = "\(maxRedeemablePoints)"
+        applyPoints()
+    }
+
+    /// Re-prices the cart. The request always carries both the coupon
+    /// code and the points (when each is applied) — the coupon discount
+    /// applies first and points cover the remaining subtotal, so the
+    /// two stack. With points applied the staging points endpoint
+    /// prices it; without points the production endpoint prices it.
+    /// If the server rejects the redemption it answers 200 with
+    /// pointsRedeemed = 0 and a reason in pointsMessage — shown
+    /// verbatim, and the points are reset.
+    private func refreshPricing() async {
+        isApplyingPoints = true
+        defer { isApplyingPoints = false }
+        do {
+            let request = cartManager.pricingRequest(
+                couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
+                pointsToRedeem: pointsApplied ? pointsToRedeem : nil
+            )
+            let url = pointsApplied ? APIConfig.Points.pricing : APIConfig.Cart.pricing
+            let response = try await CartRepository.shared.fetchPricing(request: request, url: url)
+            pricing = response
+            if pointsApplied {
+                if let message = response.pointsMessage {
+                    // Rejected: the response already carries the plain
+                    // totals (pointsDiscount = 0), so nothing needs
+                    // re-pricing — just show the reason verbatim.
+                    pointsMessage = message
+                    pointsToRedeem = 0
+                    pointsInput = ""
+                } else if response.pointsRedeemed > 0 {
+                    pointsMessage = nil
+                    // Trust the server's applied amount.
+                    pointsToRedeem = response.pointsRedeemed
+                    pointsInput = "\(response.pointsRedeemed)"
+                } else {
+                    pointsMessage = nil
+                }
+            } else {
+                pointsMessage = nil
+            }
+        } catch {
+            pointsMessage = (error as? NetworkError)?.errorDescription ?? "Could not apply points. Please try again."
+            if pointsApplied {
+                pointsToRedeem = 0
+                pointsInput = ""
+            }
+        }
+    }
+
+    /// Toggles a scratch card. Scratch cards stack with points and
+    /// coupons — selecting one leaves them applied.
+    func selectScratchCard(_ card: ScratchCard) {
+        if selectedScratchCard?.id == card.id {
+            selectedScratchCard = nil
+        } else {
+            selectedScratchCard = card
+        }
+    }
+
     // MARK: - Promo Code
     func applyCoupon() {
+        // Coupons stack with points and scratch cards — nothing is cleared.
         let code = couponCode.trimmingCharacters(in: .whitespaces)
         guard !code.isEmpty else { return }
         couponError = nil
@@ -367,6 +496,9 @@ final class CheckoutViewModel: ObservableObject {
                 if result.valid, let discount = result.discount {
                     validatedDiscount = discount
                     couponApplied = true
+                    // Price the coupon in on the server so the totals
+                    // (and the points cap) include it.
+                    await refreshPricing()
                 } else {
                     couponError = result.message ?? "Invalid or expired promo code."
                 }
@@ -390,12 +522,11 @@ final class CheckoutViewModel: ObservableObject {
         errorMessage = nil
         isPlacingOrder = true
 
-        // Points for this order, from the items (price rounded to the
-        // nearest $1, x quantity). Captured now — the cart is cleared
-        // once the order is placed, so it can't be recomputed later.
-        pendingEarnedPoints = cartManager.items.reduce(0) { total, item in
-            total + PointsManager.points(forPrice: item.product.displayPrice, quantity: item.count)
-        }
+        // Points orders go through the staging points API; everything
+        // else stays on production. Captured now — the points fields
+        // stay editable while the order is placed.
+        let stagingOrder = pointsApplied
+        placedOrderIsStaging = stagingOrder
 
         let orderItems = cartManager.items.map { item in
             OrderRequest.OrderItemRequest(
@@ -438,10 +569,15 @@ final class CheckoutViewModel: ObservableObject {
                 tax: pricing.tax,
                 shippingCost: effectiveShippingCost,
                 serviceFee: pricing.serviceFee,
-                discount: validatedDiscount + pointsDiscount + scratchCardDiscount,
+                // The discount sent here is the coupon + scratch-card
+                // value only. The server adds the points discount itself
+                // (and caps it at the remaining subtotal), so sending
+                // pointsDiscount here too would count points twice.
+                discount: validatedDiscount + scratchCardDiscount,
                 tipAmount: tipAmount,
                 total: totalWithTip,
                 couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
+                pointsToRedeem: stagingOrder ? pointsToRedeem : nil,
                 paymentMethod: paymentMethod.rawValue,
                 bundleIds: [],
                 items: orderItems
@@ -469,10 +605,15 @@ final class CheckoutViewModel: ObservableObject {
                 tax: pricing.tax,
                 shippingCost: 0,
                 serviceFee: 0,
-                discount: validatedDiscount + pointsDiscount + scratchCardDiscount,
+                // The discount sent here is the coupon + scratch-card
+                // value only. The server adds the points discount itself
+                // (and caps it at the remaining subtotal), so sending
+                // pointsDiscount here too would count points twice.
+                discount: validatedDiscount + scratchCardDiscount,
                 tipAmount: 0,
                 total: totalWithTip,
                 couponCode: couponApplied ? couponCode.trimmingCharacters(in: .whitespaces) : nil,
+                pointsToRedeem: stagingOrder ? pointsToRedeem : nil,
                 paymentMethod: paymentMethod.rawValue,
                 bundleIds: [],
                 items: orderItems
@@ -481,14 +622,21 @@ final class CheckoutViewModel: ObservableObject {
 
         Task {
             do {
-                let result = try await repository.placeOrder(request)
+                let result = try await repository.placeOrder(
+                    request,
+                    url: stagingOrder ? APIConfig.Points.placeOrder : APIConfig.Orders.place
+                )
                 cartManager.clear()
                 isPlacingOrder = false
+                // The balance changed (points were spent, or will be
+                // earned on delivery) — refresh it from the server.
+                Task { await PointsManager.shared.refresh() }
                 if paymentMethod == .cash {
                     // Cash (pickup only): there is no card payment to take,
-                    // so the order is placed — settle rewards and show the
-                    // confirmation straight away instead of the card screen.
-                    PointsManager.shared.settleOrder(earnedPoints: pendingEarnedPoints, redeemed: usePointsReward, orderLabel: "Order \(result.trackingId)")
+                    // so the order is placed — show the confirmation
+                    // straight away instead of the card screen. Points
+                    // are NOT settled here: they land on delivery, and
+                    // the server deducts redeemed points at placement.
                     if let usedCard = selectedScratchCard {
                         ScratchCardManager.shared.markUsed(usedCard)
                     }

@@ -67,13 +67,15 @@ final class SubscriptionRepository: @unchecked Sendable {
             do {
                 // The API returns either an array directly or a wrapper.
                 if let subs = try? Self.decoder.decode([Subscription].self, from: data) {
-                    saveCached(subs)
-                    return subs
+                    let list = merged(subs)
+                    saveCached(list)
+                    return list
                 }
                 struct Wrapper: Decodable { let subscriptions: [Subscription] }
                 if let wrapper = try? Self.decoder.decode(Wrapper.self, from: data) {
-                    saveCached(wrapper.subscriptions)
-                    return wrapper.subscriptions
+                    let list = merged(wrapper.subscriptions)
+                    saveCached(list)
+                    return list
                 }
                 throw NetworkError.decodingError
             } catch {
@@ -159,26 +161,53 @@ final class SubscriptionRepository: @unchecked Sendable {
     }
 
     // MARK: - Cancel a subscription
-    func cancel(id: Int) async throws {
-        if id < 0 {
-            // Local-only: just remove it on-device.
-            var cached = loadCached()
-            cached.removeAll { $0.id == id }
-            saveCached(cached)
-            return
+    // Standard rule (the one every subscription service uses): cancelling
+    // ends the subscription at the end of the current period. The next
+    // scheduled delivery is cancelled and the card is not charged again;
+    // a delivery already placed still arrives. The cancelled record is
+    // kept (status CANCELLED + the cancelled delivery date) so the
+    // customer can see what was cancelled, instead of vanishing.
+    func cancel(_ subscription: Subscription) async throws -> Subscription {
+        let cancelled = subscription.cancelledCopy()
+        if subscription.id < 0 {
+            // Local-only: just mark it cancelled on-device.
+            updateCached(cancelled)
+            return cancelled
         }
-        logger.info("DELETE /customer/subscriptions/\(id)")
+        logger.info("DELETE /customer/subscriptions/\(subscription.id)")
         let response = await Session.authenticated
-            .request(APIConfig.Subscriptions.byId(id), method: .delete)
+            .request(APIConfig.Subscriptions.byId(subscription.id), method: .delete)
             .validate(statusCode: 200..<300)
             .serializingData()
             .response
         if case .failure(let afError) = response.result {
             throw mapError(response: response, afError: afError)
         }
+        updateCached(cancelled)
+        return cancelled
+    }
+
+    /// Replace a cached subscription with an updated copy (or append it
+    /// when it is not cached yet).
+    private func updateCached(_ subscription: Subscription) {
         var cached = loadCached()
-        cached.removeAll { $0.id == id }
+        if let index = cached.firstIndex(where: { $0.id == subscription.id }) {
+            cached[index] = subscription
+        } else {
+            cached.append(subscription)
+        }
         saveCached(cached)
+    }
+
+    /// Keep locally-cancelled records the server no longer returns (the
+    /// backend deletes the record on cancel, but the customer should
+    /// still see what was cancelled). Server list first, then the kept
+    /// cancelled ones.
+    private func merged(_ serverSubs: [Subscription]) -> [Subscription] {
+        let cached = loadCached()
+        let serverIds = Set(serverSubs.map(\.id))
+        let keptCancelled = cached.filter { $0.status == .cancelled && !serverIds.contains($0.id) }
+        return serverSubs + keptCancelled
     }
 
     // MARK: - Helpers

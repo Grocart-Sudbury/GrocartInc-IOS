@@ -28,7 +28,7 @@ struct PointsHistoryView: View {
                     Text("No points yet")
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.grocartPrimary)
-                    Text("Place an order to start earning points.\nEach item earns its price rounded to the nearest $1.")
+                    Text("Place an order to start earning points. You earn \(pointsManager.rules.earnPointsPerDollar) point per $1 of your order subtotal after discounts, and points land as soon as your payment succeeds. Every account gets \(pointsManager.rules.welcomeBonusPoints) welcome points.")
                         .font(.system(size: 14))
                         .foregroundColor(.grocartSecondary)
                         .multilineTextAlignment(.center)
@@ -45,10 +45,16 @@ struct PointsHistoryView: View {
                                 Text("\(pointsManager.points) points")
                                     .font(.system(size: 22, weight: .bold))
                                     .foregroundColor(.grocartPrimary)
+                                Text("Worth \(pointsManager.formattedBalanceValue)")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.grocartSecondary)
+                                Text("Lifetime: \(pointsManager.lifetimeEarned) earned · \(pointsManager.lifetimeRedeemed) redeemed")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.grocartSecondary)
                             }
                             Spacer()
                             if pointsManager.canRedeem {
-                                Text("$5 OFF")
+                                Text("\(pointsManager.formattedBalanceValue) OFF")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 10)
@@ -72,10 +78,16 @@ struct PointsHistoryView: View {
                         .frame(height: 8)
 
                         Text(pointsManager.canRedeem
-                             ? "You can redeem $5 off your next order at checkout."
-                             : "\(pointsManager.pointsToNextReward) more points to unlock $5 off.")
+                             ? "You can redeem \(pointsManager.formattedBalanceValue) off your next order at checkout."
+                             : "\(pointsManager.pointsToNextReward) more points to unlock \(pointsManager.formattedMinRedemptionValue) off.")
                             .font(.system(size: 12))
                             .foregroundColor(.grocartSecondary)
+
+                        if pointsManager.rules.welcomeBonusPoints > 0 {
+                            Text("Every account gets \(pointsManager.rules.welcomeBonusPoints) welcome points.")
+                                .font(.system(size: 12))
+                                .foregroundColor(.grocartSecondary)
+                        }
                     }
 
                     Section("History") {
@@ -90,9 +102,13 @@ struct PointsHistoryView: View {
                                         .foregroundColor(tx.isEarned ? .grocartGreen : .red)
                                 }
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(tx.label)
+                                    Text(tx.type.displayLabel)
                                         .font(.system(size: 14, weight: .semibold))
                                         .foregroundColor(.grocartPrimary)
+                                        .lineLimit(1)
+                                    Text(tx.label)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.grocartSecondary)
                                         .lineLimit(1)
                                     Text(tx.formattedDate)
                                         .font(.system(size: 12))
@@ -113,5 +129,12 @@ struct PointsHistoryView: View {
         }
         .navigationTitle("My Points")
         .navigationBarTitleDisplayMode(.inline)
+        // Fresh balance every time the screen opens, so a bonus the
+        // server just granted (e.g. the welcome bonus for an older
+        // account) shows up instead of the cached summary.
+        // NOTE: no refresh on appear here on purpose. Refreshing flips
+        // shared PointsManager state while this screen is being pushed,
+        // and that pops the screen straight back to Profile. Profile
+        // refreshes the balance BEFORE navigating instead.
     }
 }

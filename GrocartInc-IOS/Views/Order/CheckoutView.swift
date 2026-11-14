@@ -55,11 +55,11 @@ struct CheckoutView: View {
             NavigationLink(
                 destination: Group {
                     if let order = viewModel.pendingPaymentOrder {
-                        PaymentView(order: order) { confirmedOrder in
+                        PaymentView(order: order, isStagingOrder: viewModel.placedOrderIsStaging) { confirmedOrder in
                             logger.info("✅ PaymentView onPaymentSuccess — orderId=\(confirmedOrder.id)")
-                            // Settle rewards: take 500 points if redeemed,
-                            // then award the points earned on this order's items.
-                            PointsManager.shared.settleOrder(earnedPoints: viewModel.pendingEarnedPoints, redeemed: viewModel.usePointsReward, orderLabel: "Order \(confirmedOrder.trackingId)")
+                            // Points are NOT settled here: redeemed points
+                            // were deducted by the server at placement, and
+                            // earned points land when the payment succeeds.
                             if let usedCard = viewModel.selectedScratchCard {
                                 ScratchCardManager.shared.markUsed(usedCard)
                             }
@@ -102,6 +102,7 @@ struct CheckoutView: View {
                 Task { await viewModel.fetchSlotsForSelectedDate() }
             }
             Task { await viewModel.loadSavedCards() }
+            Task { await PointsManager.shared.refresh() }
         }
         .sheet(isPresented: $showAddCard) {
             StandaloneAddCardView(setAsDefault: viewModel.savedCards.isEmpty) { _ in
@@ -127,7 +128,7 @@ struct CheckoutView: View {
         .fullScreenCover(item: $viewModel.placedOrder, onDismiss: {
             dismiss()
         }) { order in
-            OrderConfirmationView(order: order, pointsEarned: viewModel.pendingEarnedPoints, scratchCard: viewModel.earnedScratchCard)
+            OrderConfirmationView(order: order, pointsRedeemed: order.pointsRedeemed ?? 0, scratchCard: viewModel.earnedScratchCard)
         }
         .sheet(isPresented: $showAddressSelector) {
             AddressSelectorView(selectedAddress: $viewModel.selectedAddress)
@@ -618,17 +619,14 @@ struct CheckoutView: View {
                     Text("\(pointsManager.points) points")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.grocartPrimary)
-                    if pointsManager.canRedeem {
-                        Text("You can redeem $5 off this order")
-                            .font(.system(size: 12))
-                            .foregroundColor(.grocartSecondary)
-                    } else {
-                        Text("Only redeemable at 500 points")
-                            .font(.system(size: 12))
-                            .foregroundColor(.grocartSecondary)
-                    }
+                    Text("Worth \(pointsManager.formattedBalanceValue)")
+                        .font(.system(size: 12))
+                        .foregroundColor(.grocartSecondary)
                 }
                 Spacer()
+                if pointsManager.isLoading {
+                    ProgressView().scaleEffect(0.8)
+                }
             }
 
             GeometryReader { geo in
@@ -643,25 +641,98 @@ struct CheckoutView: View {
             }
             .frame(height: 8)
 
-            if pointsManager.canRedeem {
-                // 500+ points: choose to bank them or use them on this order.
-                Picker("Redeem points", selection: $viewModel.usePointsReward) {
-                    Text("Bank points").tag(false)
-                    Text("Use 500 pts").tag(true)
-                }
-                .pickerStyle(.segmented)
+            Text(pointsManager.canRedeem
+                 ? "You can redeem points on this order."
+                 : "\(pointsManager.pointsToNextReward) more points to unlock redemption.")
+                .font(.system(size: 12))
+                .foregroundColor(.grocartSecondary)
 
-                Text(viewModel.usePointsReward
-                     ? "500 points will be used for $5 off this order."
-                     : "Your points stay saved for a later order.")
+            // Amount entry: type how many points to use, or use the max.
+            HStack(spacing: 10) {
+                TextField("Points to use", text: $viewModel.pointsInput)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 15))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 12)
+                    .background(Color.grocartBackground)
+                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                    .disabled(viewModel.pointsApplied)
+
+                Button(action: { viewModel.useMaxPoints() }) {
+                    Text("Use max")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 86, height: 42)
+                        .background(Color.grocartGreen)
+                        .cornerRadius(10)
+                }
+                .disabled(!viewModel.canRedeemPoints || viewModel.pointsApplied || viewModel.isApplyingPoints)
+
+                if viewModel.pointsApplied {
+                    Button(action: { viewModel.clearPoints() }) {
+                        Text("Clear")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.grocartGreen)
+                            .frame(width: 64, height: 42)
+                            .background(Color.grocartGreen.opacity(0.1))
+                            .cornerRadius(10)
+                    }
+                    .disabled(viewModel.isApplyingPoints)
+                } else {
+                    Button(action: { viewModel.applyPoints() }) {
+                        Group {
+                            if viewModel.isApplyingPoints {
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Apply")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .frame(width: 64, height: 42)
+                        .background(Color.grocartGreen)
+                        .cornerRadius(10)
+                    }
+                    .disabled(!viewModel.canRedeemPoints || viewModel.isApplyingPoints)
+                }
+            }
+
+            if let message = viewModel.pointsMessage {
+                // The server's own reason, shown verbatim.
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.system(size: 14))
+                    Text(message)
+                        .font(.system(size: 13))
+                        .foregroundColor(.red)
+                }
+            } else if viewModel.pointsApplied {
+                Text("\(viewModel.pointsToRedeem) points applied — \(String(format: "$%.2f", viewModel.pointsDiscount)) off this order. Points for this order will be added when your payment succeeds.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.grocartSecondary)
+            } else if !viewModel.canRedeemPoints {
+                Text(pointsDisabledReason)
                     .font(.system(size: 12))
                     .foregroundColor(.grocartSecondary)
             } else {
-                Text("You have \(pointsManager.points) points — \(pointsManager.pointsToNextReward) more to unlock $5 off. Earn 1 point for every $1 you spend.")
+                Text("Redeem from \(pointsManager.rules.minRedeemPoints) points — any amount up to your balance. You earn \(pointsManager.rules.earnPointsPerDollar) point per $1 of your order subtotal after discounts.")
                     .font(.system(size: 12))
                     .foregroundColor(.grocartSecondary)
             }
         }
+    }
+
+    /// Why points cannot be redeemed on this order right now, using
+    /// the server's own rule values.
+    private var pointsDisabledReason: String {
+        let rules = pointsManager.rules
+        if pointsManager.points < rules.minRedeemPoints {
+            return "Redeem from \(rules.minRedeemPoints) points — you have \(pointsManager.points)."
+        }
+        return "You can redeem up to \(viewModel.maxRedeemablePoints) points on this order."
     }
 
     // MARK: - Scratch Card
@@ -704,7 +775,7 @@ struct CheckoutView: View {
         let isSelected = viewModel.selectedScratchCard?.id == scratchCard.id
         let discount = ScratchCardManager.discount(for: scratchCard, subtotal: viewModel.pricing.subtotal)
         return Button(action: {
-            viewModel.selectedScratchCard = isSelected ? nil : scratchCard
+            viewModel.selectScratchCard(scratchCard)
         }) {
             HStack(spacing: 8) {
                 Image(systemName: "ticket.fill")
